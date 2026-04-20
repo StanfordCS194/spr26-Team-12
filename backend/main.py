@@ -1,11 +1,20 @@
 import os
 import uuid
 import asyncio
+from datetime import datetime
+
 import certifi
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+from models import (
+    AnalysisResult, SegmentAnalysis, SpeakerMatch,
+    ReportRequest, ReportResponse,
+)
+from database import init_db, save_analysis, get_analysis, save_report, get_report
+from report_pdf import generate_pdf
 
 YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
 SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
@@ -27,6 +36,11 @@ ALLOWED_TYPES = {
     "audio/x-m4a", "audio/m4a", "video/mp4",
 }
 MAX_SIZE = 100 * 1024 * 1024  # 100 MB
+
+init_db()
+
+
+# ── Feature 1: Audio Upload & Ingestion ──────────────────────────
 
 
 @app.post("/upload")
@@ -73,7 +87,6 @@ async def ingest_url(req: URLRequest):
 
 @app.get("/preview/{file_id}")
 async def preview(file_id: str):
-    # Sanitize: only allow UUIDs
     try:
         uuid.UUID(file_id)
     except ValueError:
@@ -84,3 +97,143 @@ async def preview(file_id: str):
             return FileResponse(os.path.join(UPLOAD_DIR, fname))
 
     raise HTTPException(404, "File not found")
+
+
+# ── Mock analysis (stands in for Features 2-4) ───────────────────
+
+MOCK_SEGMENTS = [
+    SegmentAnalysis(
+        start_time=0.0, end_time=3.0, confidence_score=42.0,
+        contributors=["Normal pitch variance", "Natural breath pattern", "Consistent formant transitions"],
+    ),
+    SegmentAnalysis(
+        start_time=3.0, end_time=6.0, confidence_score=78.5,
+        contributors=["Unusual pitch stability", "Spectral smoothing at 3.8kHz", "Missing micro-pauses"],
+    ),
+    SegmentAnalysis(
+        start_time=6.0, end_time=9.0, confidence_score=91.2,
+        contributors=["Synthetic vowel transitions", "Spectral artifact at 4.2kHz", "Unnatural F0 contour"],
+    ),
+    SegmentAnalysis(
+        start_time=9.0, end_time=12.0, confidence_score=88.7,
+        contributors=["TTS boundary artifact", "Flat energy envelope", "Phase discontinuity"],
+    ),
+    SegmentAnalysis(
+        start_time=12.0, end_time=15.0, confidence_score=65.3,
+        contributors=["Moderate pitch regularity", "Slight spectral banding", "Natural trailing off"],
+    ),
+]
+
+MOCK_SUMMARY = (
+    "Segments 3.0s\u201312.0s display spectral characteristics strongly associated with "
+    "neural text-to-speech synthesis, including unusual pitch stability, spectral smoothing "
+    "artifacts, and synthetic vowel transitions. The opening and closing segments show more "
+    "natural acoustic properties, suggesting possible splicing of authentic and synthetic "
+    "audio. Overall AI-generation probability: 87.3%."
+)
+
+
+@app.post("/analyze/{file_id}")
+async def analyze(file_id: str):
+    """Mock analysis — replace internals with real ML pipeline (Features 2-4) when ready."""
+    try:
+        uuid.UUID(file_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid file ID")
+
+    found = None
+    for fname in os.listdir(UPLOAD_DIR):
+        if fname.startswith(file_id):
+            found = fname
+            break
+    if not found:
+        raise HTTPException(404, "File not found")
+
+    analysis_id = str(uuid.uuid4())
+    result = AnalysisResult(
+        analysis_id=analysis_id,
+        file_id=file_id,
+        filename=found,
+        overall_score=87.3,
+        verdict="Likely AI-Generated",
+        confidence_low=82.1,
+        confidence_high=92.5,
+        segments=MOCK_SEGMENTS,
+        summary=MOCK_SUMMARY,
+        model_used="Wav2Vec 2.0 (fine-tuned) + CNN Spectrogram Ensemble",
+        speaker_match=SpeakerMatch(
+            claimed_speaker="Sen. Jane Smith",
+            similarity_score=34.2,
+            interpretation="Low similarity \u2014 voice does not match reference model",
+        ),
+        analyzed_at=datetime.utcnow().isoformat() + "Z",
+    )
+
+    save_analysis(analysis_id, file_id, found, result.model_dump())
+    return result
+
+
+@app.get("/analysis/{analysis_id}")
+async def get_analysis_result(analysis_id: str):
+    row = get_analysis(analysis_id)
+    if not row:
+        raise HTTPException(404, "Analysis not found")
+    return row["result"]
+
+
+# ── Feature 5: Shareable Report Export ────────────────────────────
+
+
+@app.post("/reports", response_model=ReportResponse)
+async def create_report(req: ReportRequest):
+    row = get_analysis(req.analysis_id)
+    if not row:
+        raise HTTPException(404, "Analysis not found")
+
+    analysis = AnalysisResult(**row["result"])
+    report_id = str(uuid.uuid4())
+    pdf_path = generate_pdf(report_id, analysis)
+
+    save_report(report_id, req.analysis_id, analysis.file_id, analysis.filename, pdf_path)
+    report = get_report(report_id)
+
+    return ReportResponse(
+        report_id=report_id,
+        share_url=f"/shared/{report_id}",
+        pdf_url=f"/reports/{report_id}/pdf",
+        created_at=report["created_at"],
+        expires_at=report["expires_at"],
+    )
+
+
+@app.get("/reports/{report_id}/pdf")
+async def download_report_pdf(report_id: str):
+    report = get_report(report_id)
+    if not report:
+        raise HTTPException(404, "Report not found or expired")
+    if not os.path.exists(report["pdf_path"]):
+        raise HTTPException(404, "PDF file missing")
+    return FileResponse(
+        report["pdf_path"],
+        media_type="application/pdf",
+        filename=f"veritas-report-{report_id[:8]}.pdf",
+    )
+
+
+@app.get("/shared/{report_id}")
+async def shared_report(report_id: str):
+    """Returns report metadata + full analysis for the shared view."""
+    report = get_report(report_id)
+    if not report:
+        raise HTTPException(404, "Report not found or link has expired")
+    analysis_row = get_analysis(report["analysis_id"])
+    if not analysis_row:
+        raise HTTPException(404, "Analysis data missing")
+    return {
+        "report": {
+            "report_id": report["report_id"],
+            "created_at": report["created_at"],
+            "expires_at": report["expires_at"],
+        },
+        "analysis": analysis_row["result"],
+    }
