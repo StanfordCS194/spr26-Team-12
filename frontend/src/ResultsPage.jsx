@@ -8,6 +8,60 @@ function ScoreBadge({ score }) {
   return <span style={{ color, fontWeight: 700 }}>{score.toFixed(1)}%</span>;
 }
 
+// Decision matrix from FEATURE-4-PLAN.md §2. Combines Feature 2 (AI score)
+// with Feature 4 (speaker similarity) so similarity is never displayed alone.
+function decisionCell(aiScore, simScore) {
+  const aiHigh = aiScore > 70, aiLow = aiScore < 30;
+  const simHigh = simScore >= 75, simLow = simScore < 45;
+  if (aiHigh && simHigh)
+    return { tone: "danger", icon: "🚨", title: "Likely cloned voice of claimed speaker",
+      body: "High AI-generation probability and high acoustic similarity to the reference voice. Consistent with a voice clone of the claimed speaker." };
+  if (aiHigh && simLow)
+    return { tone: "danger", icon: "🚨", title: "Synthetic, and not the claimed speaker",
+      body: "High AI-generation probability and low similarity to the reference voice. The clip appears synthetic and does not match the claimed speaker." };
+  if (aiHigh)
+    return { tone: "danger", icon: "🚨", title: "Suspected clone",
+      body: "High AI-generation probability with partial speaker similarity. Treat as suspected synthetic audio." };
+  if (aiLow && simHigh)
+    return { tone: "ok", icon: "✅", title: "Authentic, matches claimed speaker",
+      body: "Low AI-generation probability and high similarity to the reference voice." };
+  if (aiLow && simLow)
+    return { tone: "warn", icon: "❓", title: "Authentic, but not the claimed speaker",
+      body: "Low AI-generation probability but low similarity to the reference voice — the clip may be of a different speaker than claimed." };
+  return { tone: "warn", icon: "⚠", title: "Inconclusive — re-check source",
+    body: "AI-generation probability and speaker similarity are both in the uncertain band. Verify the source clip and try a longer recording if available." };
+}
+
+function VerdictMatrixBanner({ analysis }) {
+  if (!analysis.speaker_match) return null;
+  const cell = decisionCell(analysis.overall_score, analysis.speaker_match.similarity_score);
+  const palette = {
+    ok:     { bg: "#e8f5e9", border: "#27ae60", color: "#1e6b3a" },
+    warn:   { bg: "#fff8e1", border: "#f1c40f", color: "#7a5a00" },
+    danger: { bg: "#fdecea", border: "#c0392b", color: "#8b1a1a" },
+  }[cell.tone];
+  return (
+    <div className="section" style={{
+      background: palette.bg, border: `2px solid ${palette.border}`,
+      borderRadius: 8, padding: "16px 18px",
+    }}>
+      <div style={{ fontSize: 13, color: palette.color, fontWeight: 700, letterSpacing: 0.5 }}>
+        COMBINED VERDICT
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: palette.color, margin: "4px 0 8px" }}>
+        {cell.icon} {cell.title}
+      </div>
+      <div style={{ color: "#333", lineHeight: 1.45 }}>{cell.body}</div>
+      <div style={{ marginTop: 10, fontSize: 13, color: "#555" }}>
+        AI probability <strong>{analysis.overall_score.toFixed(1)}%</strong>
+        {" · "}
+        Speaker similarity <strong>{analysis.speaker_match.similarity_score.toFixed(1)}%</strong>
+        {" vs. "}<em>{analysis.speaker_match.claimed_speaker}</em>
+      </div>
+    </div>
+  );
+}
+
 function Heatmap({ segments }) {
   return (
     <div className="heatmap">
@@ -121,6 +175,9 @@ export default function ResultsPage() {
           {analysis.confidence_high.toFixed(1)}%
         </div>
       </div>
+
+      {/* combined AI + speaker verdict (Feature 4 decision matrix) */}
+      <VerdictMatrixBanner analysis={analysis} />
 
       {/* heatmap */}
       <div className="section">

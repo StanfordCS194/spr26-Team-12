@@ -2,6 +2,7 @@ import os
 import uuid
 import asyncio
 from datetime import datetime
+from typing import Optional
 
 import certifi
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -13,8 +14,12 @@ from models import (
     AnalysisResult, SegmentAnalysis, SpeakerMatch,
     ReportRequest, ReportResponse,
 )
-from database import init_db, save_analysis, get_analysis, save_report, get_report
+from database import (
+    init_db, save_analysis, get_analysis, save_report, get_report,
+    list_speakers, get_speaker,
+)
 from report_pdf import generate_pdf
+import speaker_match
 
 YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
 SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
@@ -38,6 +43,16 @@ ALLOWED_TYPES = {
 MAX_SIZE = 100 * 1024 * 1024  # 100 MB
 
 init_db()
+
+
+@app.on_event("startup")
+def _warm_models():
+    # Lazy-load ECAPA so the first /analyze isn't slow. Don't block startup
+    # if the model can't be reached -- speaker matching just becomes optional.
+    try:
+        speaker_match.warmup()
+    except Exception as e:
+        print(f"[warn] speaker encoder warmup failed: {e}")
 
 
 # ── Feature 1: Audio Upload & Ingestion ──────────────────────────
@@ -133,9 +148,22 @@ MOCK_SUMMARY = (
 )
 
 
+# ── Feature 4: Politician Identity Matching ───────────────────────
+
+
+@app.get("/speakers")
+async def speakers():
+    """Return the indexed reference politicians for the upload-page dropdown."""
+    return list_speakers()
+
+
+class AnalyzeRequest(BaseModel):
+    claimed_speaker_id: Optional[str] = None
+
+
 @app.post("/analyze/{file_id}")
-async def analyze(file_id: str):
-    """Mock analysis — replace internals with real ML pipeline (Features 2-4) when ready."""
+async def analyze(file_id: str, req: Optional[AnalyzeRequest] = None):
+    """Mock detection (Features 2-3) + real speaker matching (Feature 4)."""
     try:
         uuid.UUID(file_id)
     except ValueError:
@@ -149,6 +177,23 @@ async def analyze(file_id: str):
     if not found:
         raise HTTPException(404, "File not found")
 
+    audio_path = os.path.join(UPLOAD_DIR, found)
+
+    # Feature 4: real speaker matching, only if a speaker was claimed.
+    sm: Optional[SpeakerMatch] = None
+    claimed_id = req.claimed_speaker_id if req else None
+    if claimed_id:
+        if get_speaker(claimed_id) is None:
+            raise HTTPException(404, f"Unknown speaker: {claimed_id}")
+        try:
+            sm = speaker_match.compare(audio_path, claimed_id)
+        except ValueError as e:
+            # e.g. clip too short for reliable matching (R12)
+            raise HTTPException(400, str(e))
+        except Exception as e:
+            # Don't fail the whole analysis if speaker matching breaks.
+            print(f"[warn] speaker_match.compare failed: {e}")
+
     analysis_id = str(uuid.uuid4())
     result = AnalysisResult(
         analysis_id=analysis_id,
@@ -161,11 +206,7 @@ async def analyze(file_id: str):
         segments=MOCK_SEGMENTS,
         summary=MOCK_SUMMARY,
         model_used="Wav2Vec 2.0 (fine-tuned) + CNN Spectrogram Ensemble",
-        speaker_match=SpeakerMatch(
-            claimed_speaker="Sen. Jane Smith",
-            similarity_score=34.2,
-            interpretation="Low similarity \u2014 voice does not match reference model",
-        ),
+        speaker_match=sm,
         analyzed_at=datetime.utcnow().isoformat() + "Z",
     )
 

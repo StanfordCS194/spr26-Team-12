@@ -10,5 +10,10 @@ frontend/dist/
 # Database
 backend/veritas.db
 
+# Feature 4 — speaker index artifacts
+backend/pretrained_models/
+backend/data/ref_cache/
+backend/.pytest_cache/
+
 # System
 .DS_Store

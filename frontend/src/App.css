@@ -117,6 +117,30 @@ audio {
   width: 100%;
 }
 
+.speaker-picker {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.speaker-picker label {
+  font-size: 13px;
+  color: #444;
+  font-weight: 600;
+}
+.speaker-picker .hint-inline {
+  color: #888;
+  font-weight: 400;
+}
+.speaker-picker select {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+}
+
 .submit-btn {
   padding: 12px 32px;
   background: #8b1a1a;

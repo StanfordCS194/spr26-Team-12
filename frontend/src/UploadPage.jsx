@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = "http://localhost:8000";
@@ -15,7 +15,16 @@ export default function UploadPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [speakers, setSpeakers] = useState([]);
+  const [claimedSpeaker, setClaimedSpeaker] = useState("");
   const fileRef = useRef();
+
+  useEffect(() => {
+    fetch(`${API}/speakers`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setSpeakers)
+      .catch(() => setSpeakers([]));
+  }, []);
 
   function reset() {
     setFileId(null);
@@ -90,7 +99,13 @@ export default function UploadPage() {
     setAnalyzing(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/analyze/${fileId}`, { method: "POST" });
+      const res = await fetch(`${API}/analyze/${fileId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          claimed_speaker_id: claimedSpeaker || null,
+        }),
+      });
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
       navigate(`/results/${data.analysis_id}`);
@@ -155,6 +170,26 @@ export default function UploadPage() {
       {previewSrc && (
         <div className="preview">
           <p className="filename">{filename}</p>
+          {speakers.length > 0 && (
+            <div className="speaker-picker">
+              <label htmlFor="claimed-speaker">
+                Claimed speaker <span className="hint-inline">(optional)</span>
+              </label>
+              <select
+                id="claimed-speaker"
+                value={claimedSpeaker}
+                onChange={(e) => setClaimedSpeaker(e.target.value)}
+              >
+                <option value="">— None —</option>
+                {speakers.map((s) => (
+                  <option key={s.speaker_id} value={s.speaker_id}>
+                    {s.name}
+                    {s.role ? ` — ${s.role}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <audio
             controls
             src={previewSrc}

@@ -1,0 +1,3 @@
+speaker_id,name,role,sources
+demo-spk1,Demo Speaker One,Test fixture,tests/samples/spk1_snt1.wav|tests/samples/spk1_snt2.wav
+demo-spk2,Demo Speaker Two,Test fixture,tests/samples/spk2_snt1.wav|tests/samples/spk2_snt2.wav

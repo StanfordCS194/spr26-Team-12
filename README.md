@@ -24,11 +24,11 @@ Translates per-segment scores into a visual timeline so users can see where anom
 - **3.1 Visual Heatmap** — Timeline bar colored green (authentic) to red (AI-generated). Hover to see exact probability and top 3 score contributors per segment.
 - **3.2 Plain English Summary** — Auto-generated one-paragraph summary of findings with citable language for news articles.
 
-### Feature 4: Politician Identity Matching (P1) — Not Started
+### Feature 4: Politician Identity Matching (P1) — Implemented
 Compares uploaded audio against a reference voice model for the claimed speaker.
 
-- **4.1 Reference Voice Index** — ~200 political leaders indexed from C-SPAN / government archives using ECAPA-TDNN speaker verification.
-- **4.2 Speaker Similarity Score** — Cosine similarity against the reference voice, presented alongside the AI detection score. Low similarity + high AI probability = likely synthetic impersonation.
+- **4.1 Reference Voice Index** — Politicians indexed via SpeechBrain's ECAPA-TDNN speaker encoder (Apache-2.0, 192-d embeddings, trained on VoxCeleb 1+2). Embeddings only — no raw audio retained.
+- **4.2 Speaker Similarity Score** — Cosine similarity against the reference centroid, mapped to 0–100, banded into Strong / Possible / No match. Combined with the Feature 2 AI score in a server-side decision matrix that the results page renders as a single combined verdict (e.g. "Likely cloned voice", "Authentic but wrong speaker").
 
 ### Feature 5: Shareable Report Export (P1) — Implemented
 Generate and share organized reports for editorial or legal documentation.
@@ -66,7 +66,12 @@ Right-click any audio on a webpage to check it.
 ```bash
 cd backend
 python3 -m venv venv
-venv/bin/pip install fastapi uvicorn python-multipart yt-dlp certifi fpdf2
+venv/bin/pip install fastapi uvicorn python-multipart yt-dlp certifi fpdf2 pydantic
+# Feature 4 (speaker matching) extras — CPU-only torch:
+venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+venv/bin/pip install speechbrain numpy soundfile
+# Build the reference voice index (reads backend/data/speakers.csv):
+venv/bin/python build_speaker_index.py
 venv/bin/uvicorn main:app --reload
 ```
 
@@ -81,8 +86,9 @@ Open http://localhost:5173
 
 ## API Endpoints
 
-| Method | Path | Feature | Description |
-|--------|------|---------|-------------|
+| Method | Path | Feature | Descript, 4 | Run analysis. Optional JSON body `{"claimed_speaker_id": str \| null}` triggers Feature 4 speaker matching. |
+| `GET` | `/analysis/{analysis_id}` | 2* | Fetch analysis results |
+| `GET` | `/speakers` | 4 | List indexed reference politician
 | `POST` | `/upload` | 1 | Upload an audio file |
 | `POST` | `/ingest-url` | 1 | Extract audio from HTTPS URL |
 | `GET` | `/preview/{file_id}` | 1 | Stream uploaded audio for preview |

@@ -32,7 +32,62 @@ def init_db():
             expires_at  TEXT NOT NULL,
             FOREIGN KEY (analysis_id) REFERENCES analyses(analysis_id)
         );
+        CREATE TABLE IF NOT EXISTS speakers (
+            speaker_id   TEXT PRIMARY KEY,
+            name         TEXT NOT NULL,
+            role         TEXT,
+            embedding    BLOB NOT NULL,
+            n_clips      INTEGER NOT NULL,
+            duration_sec REAL NOT NULL,
+            source       TEXT,
+            created_at   TEXT NOT NULL
+        );
     """)
+    conn.close()
+
+
+# ── Feature 4: speaker reference index ───────────────────────────
+
+
+def list_speakers() -> list[dict]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT speaker_id, name, role FROM speakers ORDER BY name"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_speaker(speaker_id: str) -> dict | None:
+    conn = _conn()
+    row = conn.execute(
+        "SELECT * FROM speakers WHERE speaker_id = ?", (speaker_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def upsert_speaker(
+    speaker_id: str,
+    name: str,
+    role: str,
+    embedding: bytes,
+    n_clips: int,
+    duration_sec: float,
+    source: str,
+):
+    conn = _conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO speakers "
+        "(speaker_id, name, role, embedding, n_clips, duration_sec, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            speaker_id, name, role, embedding,
+            n_clips, duration_sec, source,
+            datetime.utcnow().isoformat(),
+        ),
+    )
+    conn.commit()
     conn.close()
 
 
