@@ -1,3 +1,5 @@
+/* ── base / upload page ─────────────────────────────────────── */
+
 .veritas-container {
   max-width: 600px;
   margin: 60px auto;
@@ -124,9 +126,237 @@ audio {
   font-size: 16px;
   cursor: pointer;
   width: 100%;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  box-sizing: border-box;
 }
 
 .submit-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+/* ── results page ──────────────────────────────────────────── */
+
+.results-page {
+  max-width: 720px;
+  text-align: left;
+}
+
+.results-page h1,
+.results-page .subtitle {
+  text-align: center;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #8b1a1a;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.verdict-card {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 28px 24px;
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.verdict-label {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.verdict-text {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.verdict-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.score-big {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 13px;
+  color: #888;
+}
+
+.confidence-interval {
+  font-size: 13px;
+  color: #666;
+}
+
+/* ── sections ──────────────────────────────────────────────── */
+
+.section {
+  margin-bottom: 28px;
+}
+
+.section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #8b1a1a;
+}
+
+.summary-text {
+  line-height: 1.6;
+  color: #333;
+}
+
+/* ── heatmap ───────────────────────────────────────────────── */
+
+.heatmap {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  height: 64px;
+}
+
+.heatmap-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: default;
+  transition: opacity 0.15s;
+}
+
+.heatmap-segment:hover {
+  opacity: 0.85;
+}
+
+.seg-time {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* ── segments table ────────────────────────────────────────── */
+
+.segments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.segments-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: #8b1a1a;
+  color: white;
+  font-weight: 600;
+}
+
+.segments-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.segments-table tr:hover td {
+  background: #faf5f5;
+}
+
+/* ── speaker match ─────────────────────────────────────────── */
+
+.speaker-match {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* ── meta ──────────────────────────────────────────────────── */
+
+.meta-info {
+  font-size: 13px;
+  color: #666;
+}
+
+.meta-info p {
+  margin: 4px 0;
+}
+
+/* ── export / report actions ───────────────────────────────── */
+
+.export-section {
+  margin-top: 32px;
+  margin-bottom: 48px;
+}
+
+.report-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.download-btn {
+  background: #2c3e50;
+}
+
+.download-btn:hover {
+  background: #34495e;
+}
+
+.share-btn {
+  background: #27ae60;
+}
+
+.share-btn:hover {
+  background: #2ecc71;
+}
+
+.expires-note {
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ── shared report page ────────────────────────────────────── */
+
+.shared-banner {
+  background: #8b1a1a;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.expired-notice {
+  margin-top: 80px;
+  text-align: center;
 }
