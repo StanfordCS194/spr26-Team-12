@@ -11,12 +11,16 @@ The main entry point for all users. Accepts audio through multiple input methods
 - **1.2 URL Input** — Paste a YouTube, Twitter/X, or direct media HTTPS link. Backend extracts audio via yt-dlp. Shows error if audio cannot be extracted.
 - **1.3 Audio Preview** — Listen to audio before submission. Submit button disabled until the user has played the audio to confirm they have the right clip.
 
-### Feature 2: AI/Human Detection Engine (P0) — Not Started
+### Feature 2: AI/Human Detection Engine (P0) — Implemented
+
 Core ML system that evaluates audio and returns a probability score for AI generation.
 
-- **2.1 Preprocessing** — Normalize audio, remove silence, segment into 3-second non-overlapping windows. Generate spectrograms with MFCC and Spectral Flux features.
-- **2.2 Model** — Fine-tuned transformer classifier (Wav2Vec 2.0 or Whisper encoder) trained on labeled political speeches, ensembled with a secondary CNN spectrogram classifier.
-- **2.3 Output** — Overall probability score (0–100%), per-segment scores, binary verdict ("Likely Authentic" vs "Likely AI-Generated"), and confidence interval.
+- **2.1 Preprocessing** — RMS-normalise, mono 16 kHz resample, trim silence, segment into 3-second non-overlapping windows. MFCC (13 coefficients + deltas), Spectral Flux, pitch (F0/pyin), ZCR, and RMS energy extracted per segment. (`backend/preprocessor.py`)
+- **2.2 Model** — Three-component ensemble in `backend/detector.py`:
+  - **Primary (60 %)**: `dima806/deepfake-vs-real-audio-detection` — Wav2Vec 2.0 base fine-tuned for deepfake audio classification (auto-downloads via HuggingFace on first run, ~400 MB). Falls back gracefully to acoustic-only if unavailable.
+  - **Acoustic ensemble (25 % / 60 % fallback)**: Six speech-science features with research-calibrated thresholds — pitch stability (F0 CV), spectral-flux regularity, MFCC-delta flatness, RMS energy CV, spectral-centroid stability, ZCR uniformity.
+  - **CNN spectrogram analyser (15 % / 40 % fallback)**: Mel-spectrogram band-energy ratio, frame temporal correlation, harmonic-to-percussive ratio, spectral-contrast stability.
+- **2.3 Output** — Overall AI probability (0–100%), per-segment scores with top-3 explainability contributors, binary verdict ("Likely Authentic" vs "Likely AI-Generated"), 95 % Wald confidence interval, plain-English citable summary.
 
 ### Feature 3: Confidence Heatmap & Explainability (P1) — Not Started
 Translates per-segment scores into a visual timeline so users can see where anomalies were detected.
@@ -50,15 +54,18 @@ Right-click any audio on a webpage to check it.
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 19, Vite, React Router |
-| Backend | Python 3.12+, FastAPI, Uvicorn |
+| Backend | Python 3.10+, FastAPI, Uvicorn |
+| Detection — Primary | Wav2Vec 2.0 (`dima806/deepfake-vs-real-audio-detection`) |
+| Detection — Secondary | Acoustic features + CNN spectrogram analysis (librosa) |
 | Database | SQLite (analyses + reports) |
 | PDF Generation | fpdf2 |
 | Audio Extraction | yt-dlp, ffmpeg |
 
 ## Requirements
-- Python 3.12+
+- Python 3.10+
 - Node 18+
 - ffmpeg (`brew install ffmpeg`)
+- ~2 GB disk for HuggingFace model cache (downloaded on first analysis)
 
 ## Setup
 
@@ -66,9 +73,11 @@ Right-click any audio on a webpage to check it.
 ```bash
 cd backend
 python3 -m venv venv
-venv/bin/pip install fastapi uvicorn python-multipart yt-dlp certifi fpdf2
+venv/bin/pip install -r requirements.txt
 venv/bin/uvicorn main:app --reload
 ```
+
+The Wav2Vec2 deepfake detection model (~400 MB) downloads automatically from HuggingFace on the first `/analyze` call. Subsequent runs use the local cache. Analysis without the model (acoustic-only fallback) works immediately.
 
 ### Frontend
 ```bash
@@ -86,14 +95,14 @@ Open http://localhost:5173
 | `POST` | `/upload` | 1 | Upload an audio file |
 | `POST` | `/ingest-url` | 1 | Extract audio from HTTPS URL |
 | `GET` | `/preview/{file_id}` | 1 | Stream uploaded audio for preview |
-| `POST` | `/analyze/{file_id}` | 2* | Run analysis (currently returns mock data) |
-| `GET` | `/analysis/{analysis_id}` | 2* | Fetch analysis results |
+| `POST` | `/analyze/{file_id}` | 2 | Run real ML analysis (preprocessing → ensemble → verdict) |
+| `GET` | `/analysis/{analysis_id}` | 2 | Fetch analysis results |
 | `POST` | `/reports` | 5 | Generate PDF report + shareable link |
 | `GET` | `/reports/{report_id}/pdf` | 5 | Download report PDF |
 | `GET` | `/shared/{report_id}` | 5 | Fetch data for shared report view |
 
-\* Mock implementation — replace with real ML pipeline.
-
 ## Source Control
 git: Agam Iheanyi-Igwe (agam01)
+
+Henok Tewolde
 Kamal Eissa
