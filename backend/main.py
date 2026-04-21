@@ -45,16 +45,20 @@ MAX_SIZE = 100 * 1024 * 1024  # 100 MB
 init_db()
 
 
-@app.on_event("startup")
-def _warm_models():
+async def _warm_models_task():
     # Lazy-load ECAPA so the first /analyze isn't slow. Don't block startup
     # if the model can't be reached -- speaker matching just becomes optional.
     try:
-        speaker_match.warmup()
+        await asyncio.wait_for(asyncio.to_thread(speaker_match.warmup), timeout=30)
+    except asyncio.TimeoutError:
+        print("[warn] speaker encoder warmup timed out")
     except Exception as e:
         print(f"[warn] speaker encoder warmup failed: {e}")
 
 
+@app.on_event("startup")
+async def _warm_models():
+    asyncio.create_task(_warm_models_task())
 # ── Feature 1: Audio Upload & Ingestion ──────────────────────────
 
 
