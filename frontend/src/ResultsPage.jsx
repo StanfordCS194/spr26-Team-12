@@ -5,8 +5,8 @@ const API = "http://localhost:8000";
 const DECISION_THRESHOLDS = {
   aiScoreLow: 30,
   aiScoreHigh: 70,
-  speakerScorePossible: 45,
-  speakerScoreStrong: 75,
+  speakerScoreLow: 45,
+  speakerScoreHigh: 75,
 };
 
 function ScoreBadge({ score }) {
@@ -19,8 +19,8 @@ function ScoreBadge({ score }) {
 function decisionCell(aiScore, simScore) {
   const aiHigh = aiScore > DECISION_THRESHOLDS.aiScoreHigh;
   const aiLow = aiScore < DECISION_THRESHOLDS.aiScoreLow;
-  const simHigh = simScore >= DECISION_THRESHOLDS.speakerScoreStrong;
-  const simLow = simScore < DECISION_THRESHOLDS.speakerScorePossible;
+  const simHigh = simScore >= DECISION_THRESHOLDS.speakerScoreHigh;
+  const simLow = simScore < DECISION_THRESHOLDS.speakerScoreLow;
   if (aiHigh && simHigh)
     return { tone: "danger", icon: "🚨", title: "Likely cloned voice of claimed speaker",
       body: "High AI-generation probability and high acoustic similarity to the reference voice. Consistent with a voice clone of the claimed speaker." };
