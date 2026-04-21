@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 
 const API = "http://localhost:8000";
+const DECISION_THRESHOLDS = {
+  aiLow: 30,
+  aiHigh: 70,
+  speakerPossible: 45,
+  speakerStrong: 75,
+};
 
 function ScoreBadge({ score }) {
   const color = score >= 50 ? "#c0392b" : "#27ae60";
@@ -11,8 +17,10 @@ function ScoreBadge({ score }) {
 // Decision matrix from FEATURE-4-PLAN.md §2. Combines Feature 2 (AI score)
 // with Feature 4 (speaker similarity) so similarity is never displayed alone.
 function decisionCell(aiScore, simScore) {
-  const aiHigh = aiScore > 70, aiLow = aiScore < 30;
-  const simHigh = simScore >= 75, simLow = simScore < 45;
+  const aiHigh = aiScore > DECISION_THRESHOLDS.aiHigh;
+  const aiLow = aiScore < DECISION_THRESHOLDS.aiLow;
+  const simHigh = simScore >= DECISION_THRESHOLDS.speakerStrong;
+  const simLow = simScore < DECISION_THRESHOLDS.speakerPossible;
   if (aiHigh && simHigh)
     return { tone: "danger", icon: "🚨", title: "Likely cloned voice of claimed speaker",
       body: "High AI-generation probability and high acoustic similarity to the reference voice. Consistent with a voice clone of the claimed speaker." };
