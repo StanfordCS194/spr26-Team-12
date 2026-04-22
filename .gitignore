@@ -10,5 +10,8 @@ frontend/dist/
 # Database
 backend/veritas.db
 
+# Environment
+backend/.env
+
 # System
 .DS_Store

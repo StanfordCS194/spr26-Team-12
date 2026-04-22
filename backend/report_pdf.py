@@ -1,18 +1,15 @@
 """
-Placeholder PDF report generator for Veritas.
+PDF report generator for Veritas.
 
 Layout is intentionally minimal — swap in Figma-designed branding
 by updating the header/footer and adding logo assets.
 """
 
-import os
+import io
 
 from fpdf import FPDF
 
 from models import AnalysisResult
-
-REPORTS_DIR = "/tmp/veritas/reports"
-os.makedirs(REPORTS_DIR, exist_ok=True)
 
 
 def _safe(text: str) -> str:
@@ -51,7 +48,11 @@ def _label_value(pdf: FPDF, label: str, value: str):
     pdf.cell(0, 7, value, new_x="LMARGIN", new_y="NEXT")
 
 
-def generate_pdf(report_id: str, analysis: AnalysisResult) -> str:
+def generate_pdf(
+    report_id: str,
+    analysis: AnalysisResult,
+    heatmap_png: bytes | None = None,
+) -> bytes:
     pdf = VeritasReport()
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
@@ -91,20 +92,25 @@ def generate_pdf(report_id: str, analysis: AnalysisResult) -> str:
     )
     pdf.ln(4)
 
-    # ── heatmap placeholder ──
+    # ── heatmap ──
     pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 10, "Confidence Heatmap", new_x="LMARGIN", new_y="NEXT")
-    y = pdf.get_y()
-    pdf.set_fill_color(245, 245, 245)
-    pdf.rect(10, y, 190, 30, "F")
-    pdf.set_draw_color(200, 200, 200)
-    pdf.rect(10, y, 190, 30, "D")
-    pdf.set_font("Helvetica", "I", 10)
-    pdf.set_text_color(150, 150, 150)
-    pdf.set_xy(10, y + 10)
-    pdf.cell(190, 10, "[Heatmap visualization -- placeholder for Figma design]", align="C")
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_y(y + 35)
+
+    if heatmap_png:
+        pdf.image(io.BytesIO(heatmap_png), x=10, w=190)
+        pdf.ln(4)
+    else:
+        y = pdf.get_y()
+        pdf.set_fill_color(245, 245, 245)
+        pdf.rect(10, y, 190, 30, "F")
+        pdf.set_draw_color(200, 200, 200)
+        pdf.rect(10, y, 190, 30, "D")
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.set_text_color(150, 150, 150)
+        pdf.set_xy(10, y + 10)
+        pdf.cell(190, 10, "[Heatmap visualization -- placeholder]", align="C")
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_y(y + 35)
 
     # ── summary ──
     pdf.set_font("Helvetica", "B", 14)
@@ -148,6 +154,4 @@ def generate_pdf(report_id: str, analysis: AnalysisResult) -> str:
         _label_value(pdf, "Similarity", f"{sm.similarity_score:.1f}%")
         _label_value(pdf, "Interpretation", _safe(sm.interpretation))
 
-    pdf_path = os.path.join(REPORTS_DIR, f"{report_id}.pdf")
-    pdf.output(pdf_path)
-    return pdf_path
+    return bytes(pdf.output())

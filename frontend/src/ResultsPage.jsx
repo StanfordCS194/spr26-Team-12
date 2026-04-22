@@ -207,7 +207,7 @@ export default function ResultsPage() {
         ) : (
           <div className="report-actions">
             <a
-              href={`${API}${report.pdf_url}`}
+              href={report.pdf_url}
               className="submit-btn download-btn"
               target="_blank"
               rel="noopener noreferrer"

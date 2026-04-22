@@ -178,7 +178,7 @@ export default function SharedReportPage() {
       {/* download */}
       <div className="export-section">
         <a
-          href={`${API}/reports/${report.report_id}/pdf`}
+          href={report.pdf_url}
           className="submit-btn download-btn"
           target="_blank"
           rel="noopener noreferrer"

@@ -3,6 +3,9 @@ import uuid
 import asyncio
 from datetime import datetime
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import certifi
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +18,8 @@ from models import (
 )
 from database import init_db, save_analysis, get_analysis, save_report, get_report
 from report_pdf import generate_pdf
+from heatmap import generate_heatmap_png
+from storage import upload_heatmap, upload_report_pdf
 
 YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
 SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
@@ -150,6 +155,11 @@ async def analyze(file_id: str):
         raise HTTPException(404, "File not found")
 
     analysis_id = str(uuid.uuid4())
+
+    segments = MOCK_SEGMENTS
+    heatmap_png = generate_heatmap_png(segments)
+    heatmap_url = upload_heatmap(analysis_id, heatmap_png)
+
     result = AnalysisResult(
         analysis_id=analysis_id,
         file_id=file_id,
@@ -158,7 +168,7 @@ async def analyze(file_id: str):
         verdict="Likely AI-Generated",
         confidence_low=82.1,
         confidence_high=92.5,
-        segments=MOCK_SEGMENTS,
+        segments=segments,
         summary=MOCK_SUMMARY,
         model_used="Wav2Vec 2.0 (fine-tuned) + CNN Spectrogram Ensemble",
         speaker_match=SpeakerMatch(
@@ -166,6 +176,7 @@ async def analyze(file_id: str):
             similarity_score=34.2,
             interpretation="Low similarity \u2014 voice does not match reference model",
         ),
+        heatmap_url=heatmap_url,
         analyzed_at=datetime.utcnow().isoformat() + "Z",
     )
 
@@ -192,31 +203,20 @@ async def create_report(req: ReportRequest):
 
     analysis = AnalysisResult(**row["result"])
     report_id = str(uuid.uuid4())
-    pdf_path = generate_pdf(report_id, analysis)
 
-    save_report(report_id, req.analysis_id, analysis.file_id, analysis.filename, pdf_path)
+    heatmap_png = generate_heatmap_png(analysis.segments)
+    pdf_bytes = generate_pdf(report_id, analysis, heatmap_png=heatmap_png)
+    pdf_url = upload_report_pdf(report_id, pdf_bytes)
+
+    save_report(report_id, req.analysis_id, analysis.file_id, analysis.filename, pdf_url)
     report = get_report(report_id)
 
     return ReportResponse(
         report_id=report_id,
         share_url=f"/shared/{report_id}",
-        pdf_url=f"/reports/{report_id}/pdf",
+        pdf_url=pdf_url,
         created_at=report["created_at"],
         expires_at=report["expires_at"],
-    )
-
-
-@app.get("/reports/{report_id}/pdf")
-async def download_report_pdf(report_id: str):
-    report = get_report(report_id)
-    if not report:
-        raise HTTPException(404, "Report not found or expired")
-    if not os.path.exists(report["pdf_path"]):
-        raise HTTPException(404, "PDF file missing")
-    return FileResponse(
-        report["pdf_path"],
-        media_type="application/pdf",
-        filename=f"veritas-report-{report_id[:8]}.pdf",
     )
 
 
@@ -232,6 +232,7 @@ async def shared_report(report_id: str):
     return {
         "report": {
             "report_id": report["report_id"],
+            "pdf_url": report["pdf_url"],
             "created_at": report["created_at"],
             "expires_at": report["expires_at"],
         },

@@ -51,22 +51,32 @@ Right-click any audio on a webpage to check it.
 |-------|-----------|
 | Frontend | React 19, Vite, React Router |
 | Backend | Python 3.12+, FastAPI, Uvicorn |
-| Database | SQLite (analyses + reports) |
+| Database | Supabase (PostgreSQL) |
+| Storage | Supabase Storage (heatmaps + reports buckets) |
 | PDF Generation | fpdf2 |
+| Heatmap Generation | matplotlib |
 | Audio Extraction | yt-dlp, ffmpeg |
 
 ## Requirements
 - Python 3.12+
 - Node 18+
 - ffmpeg (`brew install ffmpeg`)
+- Supabase project (free tier works)
 
 ## Setup
+
+### Supabase
+1. Create a project at https://supabase.com
+2. Create two **public** storage buckets: `heatmaps` and `reports`
+3. Run the table creation SQL in the SQL Editor (see `backend/.env` for the full SQL)
+4. Copy your project URL and anon key into `backend/.env`
 
 ### Backend
 ```bash
 cd backend
+cp .env.example .env   # then fill in your Supabase credentials
 python3 -m venv venv
-venv/bin/pip install fastapi uvicorn python-multipart yt-dlp certifi fpdf2
+venv/bin/pip install fastapi uvicorn python-multipart yt-dlp certifi fpdf2 supabase python-dotenv matplotlib
 venv/bin/uvicorn main:app --reload
 ```
 
@@ -86,10 +96,9 @@ Open http://localhost:5173
 | `POST` | `/upload` | 1 | Upload an audio file |
 | `POST` | `/ingest-url` | 1 | Extract audio from HTTPS URL |
 | `GET` | `/preview/{file_id}` | 1 | Stream uploaded audio for preview |
-| `POST` | `/analyze/{file_id}` | 2* | Run analysis (currently returns mock data) |
+| `POST` | `/analyze/{file_id}` | 2* | Run analysis, generate heatmap, store in Supabase |
 | `GET` | `/analysis/{analysis_id}` | 2* | Fetch analysis results |
-| `POST` | `/reports` | 5 | Generate PDF report + shareable link |
-| `GET` | `/reports/{report_id}/pdf` | 5 | Download report PDF |
+| `POST` | `/reports` | 5 | Generate PDF + upload to Supabase Storage |
 | `GET` | `/shared/{report_id}` | 5 | Fetch data for shared report view |
 
 \* Mock implementation — replace with real ML pipeline.

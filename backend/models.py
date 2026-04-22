@@ -35,6 +35,7 @@ class AnalysisResult(BaseModel):
     summary: str
     model_used: str
     speaker_match: Optional[SpeakerMatch] = None
+    heatmap_url: Optional[str] = None
     analyzed_at: str  # ISO-8601
 
 

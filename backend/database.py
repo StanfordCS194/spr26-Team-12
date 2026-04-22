@@ -1,86 +1,61 @@
 import json
 import os
-import sqlite3
 from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "veritas.db")
+from supabase import create_client
+
+_client = None
 
 
-def _conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def _sb():
+    global _client
+    if _client is None:
+        _client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+    return _client
 
 
 def init_db():
-    conn = _conn()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS analyses (
-            analysis_id TEXT PRIMARY KEY,
-            file_id     TEXT NOT NULL,
-            filename    TEXT NOT NULL,
-            result_json TEXT NOT NULL,
-            created_at  TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS reports (
-            report_id   TEXT PRIMARY KEY,
-            analysis_id TEXT NOT NULL,
-            file_id     TEXT NOT NULL,
-            filename    TEXT NOT NULL,
-            pdf_path    TEXT NOT NULL,
-            created_at  TEXT NOT NULL,
-            expires_at  TEXT NOT NULL,
-            FOREIGN KEY (analysis_id) REFERENCES analyses(analysis_id)
-        );
-    """)
-    conn.close()
+    pass
 
 
 def save_analysis(analysis_id: str, file_id: str, filename: str, result: dict):
-    conn = _conn()
-    conn.execute(
-        "INSERT INTO analyses (analysis_id, file_id, filename, result_json, created_at) VALUES (?, ?, ?, ?, ?)",
-        (analysis_id, file_id, filename, json.dumps(result), datetime.utcnow().isoformat()),
-    )
-    conn.commit()
-    conn.close()
+    _sb().table("analyses").insert({
+        "analysis_id": analysis_id,
+        "file_id": file_id,
+        "filename": filename,
+        "result_json": json.dumps(result),
+        "created_at": datetime.utcnow().isoformat(),
+    }).execute()
 
 
 def get_analysis(analysis_id: str) -> dict | None:
-    conn = _conn()
-    row = conn.execute(
-        "SELECT * FROM analyses WHERE analysis_id = ?", (analysis_id,)
-    ).fetchone()
-    conn.close()
-    if not row:
+    resp = _sb().table("analyses").select("*").eq("analysis_id", analysis_id).execute()
+    if not resp.data:
         return None
-    data = dict(row)
-    data["result"] = json.loads(data["result_json"])
-    return data
+    row = resp.data[0]
+    row["result"] = json.loads(row["result_json"])
+    return row
 
 
-def save_report(report_id: str, analysis_id: str, file_id: str, filename: str, pdf_path: str):
+def save_report(report_id: str, analysis_id: str, file_id: str, filename: str, pdf_url: str):
     now = datetime.utcnow()
     expires = now + timedelta(days=30)
-    conn = _conn()
-    conn.execute(
-        "INSERT INTO reports (report_id, analysis_id, file_id, filename, pdf_path, created_at, expires_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (report_id, analysis_id, file_id, filename, pdf_path, now.isoformat(), expires.isoformat()),
-    )
-    conn.commit()
-    conn.close()
+    _sb().table("reports").insert({
+        "report_id": report_id,
+        "analysis_id": analysis_id,
+        "file_id": file_id,
+        "filename": filename,
+        "pdf_url": pdf_url,
+        "created_at": now.isoformat(),
+        "expires_at": expires.isoformat(),
+    }).execute()
 
 
 def get_report(report_id: str) -> dict | None:
-    conn = _conn()
-    row = conn.execute(
-        "SELECT * FROM reports WHERE report_id = ?", (report_id,)
-    ).fetchone()
-    conn.close()
-    if not row:
+    resp = _sb().table("reports").select("*").eq("report_id", report_id).execute()
+    if not resp.data:
         return None
-    report = dict(row)
+    report = resp.data[0]
     if datetime.fromisoformat(report["expires_at"]) < datetime.utcnow():
         return None
     return report
