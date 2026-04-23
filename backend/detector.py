@@ -1,26 +1,28 @@
 """
 Feature 2 — AI / Human Detection Engine
 
-Architecture
-────────────
-Primary model  (60 % weight when available)
-    facebook/wav2vec2-base fine-tuned for deepfake detection
-    (dima806/deepfake-vs-real-audio-detection via HuggingFace)
-    Falls back gracefully when torch / transformers are absent or the
-    first download fails.
+Architecture (best → fallback)
+───────────────────────────────
+Tier 1  Resemble AI Detect API  (external, highest accuracy)
+    Whole-file score + per-chunk scores (frame_length=3 aligns with segments).
+    Enabled when RESEMBLE_API_KEY + public HTTPS BACKEND_URL are set.
+    Contributes 55 % to the overall score; per-chunk scores drive the heatmap.
 
-Secondary model  (40 % weight — always runs)
-    Ensemble of two acoustic analysers:
-      · AcousticAnalyser  — classic speech-science features (MFCC deltas,
-                             pitch jitter, spectral flux, RMS dynamics, ZCR)
-      · SpectrogramCNN     — mel-spectrogram band analysis, harmonic
-                             structure, and temporal frame-correlation
-                             (mirrors what a CNN learns from spectrograms)
+Tier 2  Wav2Vec2 deepfake classifier  (local, optional)
+    dima806/deepfake-vs-real-audio-detection via HuggingFace.
+    Lazy-loads on first request; falls back gracefully if torch/GPU absent.
+
+Tier 3  Acoustic Feature Analyser  (always runs)
+    MFCC deltas, pitch jitter (F0 CV), spectral flux, RMS dynamics, ZCR.
+
+Tier 4  CNN Spectrogram Analyser  (always runs)
+    Mel-spectrogram band energy, temporal frame correlation, harmonic cleanness,
+    spectral contrast stability.
 
 Output  (Feature 2.3)
     DetectionResult contains overall_score, verdict, 95 % CI,
     per-segment scores with top-3 explainability contributors, and
-    a plain-English summary.
+    a plain-English summary with M:SS timestamps.
 """
 
 from __future__ import annotations
@@ -430,12 +432,20 @@ def _plain_english_summary(
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-def analyze(audio_path: str) -> DetectionResult:
+def analyze(
+    audio_path: str,
+    resemble_api_score: Optional[float] = None,
+    resemble_chunk_scores: Optional[list[float]] = None,
+) -> DetectionResult:
     """
     Full Feature 2 pipeline:
         1. Preprocess audio (2.1)
-        2. Score each 3-second segment with the ensemble model (2.2)
-        3. Aggregate scores → overall result with CI and verdict (2.3)
+        2. Score each 3-second segment with the ensemble (2.2)
+        3. Aggregate → overall result with CI and verdict (2.3)
+
+    Optional Resemble AI scores (computed in main.py before this call):
+        resemble_api_score     — whole-file score 0–100 (highest accuracy)
+        resemble_chunk_scores  — per-chunk scores aligned to 3-second segments
     """
     # ── 2.1 Preprocessing ────────────────────────────────────────────────
     y, sr = load_and_preprocess(audio_path)
@@ -448,37 +458,58 @@ def analyze(audio_path: str) -> DetectionResult:
         )
         segments = segments[:MAX_SEGMENTS]
 
-    # Determine which models are active
-    has_w2v2 = _get_w2v2_pipe() is not None
+    # ── Determine which models are active ─────────────────────────────────
+    has_resemble = resemble_api_score is not None
+    has_w2v2    = _get_w2v2_pipe() is not None
+    chunks      = resemble_chunk_scores or []
 
+    # Build readable model-used string for UI + PDF
+    model_parts: list[str] = []
+    if has_resemble:
+        model_parts.append("Resemble AI Detect")
     if has_w2v2:
-        model_name = (
-            "Wav2Vec2 Deepfake Classifier (dima806) + "
-            "Acoustic Feature Ensemble + CNN Spectrogram Analysis"
-        )
-        # Ensemble weights: wav2vec2 60 %, acoustic 25 %, CNN 15 %
+        model_parts.append("Wav2Vec2 (dima806)")
+    model_parts.append("Acoustic Feature Ensemble + CNN Spectrogram Analysis")
+    model_name = " + ".join(model_parts)
+
+    # Local-only weights (used when Resemble chunk score is absent for a segment)
+    if has_w2v2:
         w_w2v2, w_acou, w_cnn = 0.60, 0.25, 0.15
     else:
-        model_name = "Acoustic Feature Ensemble + CNN Spectrogram Analysis"
-        # Acoustic 60 %, CNN 40 %
         w_w2v2, w_acou, w_cnn = 0.00, 0.60, 0.40
 
     # ── 2.2 Per-segment scoring ───────────────────────────────────────────
     seg_results: list[SegmentResult] = []
 
-    for seg in segments:
+    for i, seg in enumerate(segments):
         acou_val, acou_contrib = acoustic_score(seg.audio, seg.sample_rate)
-        cnn_val, cnn_contrib = spectrogram_cnn_score(seg.audio, seg.sample_rate)
-        w2v2_val = wav2vec2_score(seg.audio, seg.sample_rate) if has_w2v2 else None
+        cnn_val, cnn_contrib   = spectrogram_cnn_score(seg.audio, seg.sample_rate)
+        w2v2_val               = wav2vec2_score(seg.audio, seg.sample_rate) if has_w2v2 else None
 
-        if w2v2_val is not None:
+        # Resemble chunk score for this segment index (3 s alignment)
+        resemble_seg = chunks[i] if i < len(chunks) else None
+
+        if resemble_seg is not None and w2v2_val is not None:
+            # All tiers: Resemble 45 % + Wav2Vec2 30 % + Acoustic 15 % + CNN 10 %
+            final = 0.45 * resemble_seg + 0.30 * w2v2_val + 0.15 * acou_val + 0.10 * cnn_val
+        elif resemble_seg is not None:
+            # Resemble + acoustic + CNN: 50 % + 30 % + 20 %
+            final = 0.50 * resemble_seg + 0.30 * acou_val + 0.20 * cnn_val
+        elif w2v2_val is not None:
             final = w_w2v2 * w2v2_val + w_acou * acou_val + w_cnn * cnn_val
         else:
-            # Redistribute wav2vec2 weight proportionally if it failed mid-run
-            total_fallback = w_acou + w_cnn
-            final = (w_acou / total_fallback) * acou_val + (w_cnn / total_fallback) * cnn_val
+            total = w_acou + w_cnn
+            final = (w_acou / total) * acou_val + (w_cnn / total) * cnn_val
 
         contributors = _merge_contributors(acou_contrib, cnn_contrib, w2v2_val)
+        # Surface Resemble as a contributor when it drove the segment score
+        if resemble_seg is not None:
+            resemble_label = "Resemble AI deepfake detection score"
+            if resemble_label not in contributors:
+                if len(contributors) >= 3:
+                    contributors[2] = resemble_label
+                else:
+                    contributors.append(resemble_label)
 
         seg_results.append(SegmentResult(
             start_time=seg.start_time,
@@ -488,15 +519,21 @@ def analyze(audio_path: str) -> DetectionResult:
         ))
 
     # ── 2.3 Aggregate output ──────────────────────────────────────────────
-    scores = np.array([s.confidence_score for s in seg_results], dtype=np.float64)
-    overall = float(np.clip(scores.mean(), 0, 100))
+    scores       = np.array([s.confidence_score for s in seg_results], dtype=np.float64)
+    segment_mean = float(np.clip(scores.mean(), 0, 100))
 
-    # 95 % Wald confidence interval on the mean, with a minimum half-width
-    n = len(scores)
-    sem = float(scores.std(ddof=0) / np.sqrt(n)) if n > 1 else MIN_CI_HALF_WIDTH
+    # Blend Resemble whole-file score (55 %) with segment ensemble mean (45 %)
+    if has_resemble:
+        overall = float(np.clip(0.55 * resemble_api_score + 0.45 * segment_mean, 0, 100))
+    else:
+        overall = segment_mean
+
+    # 95 % Wald CI on the segment mean, with a minimum half-width
+    n         = len(scores)
+    sem       = float(scores.std(ddof=0) / np.sqrt(n)) if n > 1 else MIN_CI_HALF_WIDTH
     half_width = max(1.96 * sem, MIN_CI_HALF_WIDTH)
 
-    ci_low = round(float(np.clip(overall - half_width, 0, 100)), 1)
+    ci_low  = round(float(np.clip(overall - half_width, 0, 100)), 1)
     ci_high = round(float(np.clip(overall + half_width, 0, 100)), 1)
 
     verdict = "Likely AI-Generated" if overall >= VERDICT_THRESHOLD else "Likely Authentic"
