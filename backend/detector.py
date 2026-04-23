@@ -73,12 +73,12 @@ class DetectionResult:
 # → 1.0 means strongly AI-like, 0.0 means clearly natural.
 _ACOUSTIC_THRESHOLDS: dict[str, tuple[float, float]] = {
     #                              TTS-like  Natural
-    "pitch_stability":             (0.03,    0.12),   # F0 coefficient of variation
-    "spectral_flux_regularity":    (0.40,    0.90),   # spectral-flux CV
-    "mfcc_delta_flatness":         (0.70,    1.80),   # MFCC-delta CV
-    "energy_envelope_flatness":    (0.15,    0.55),   # RMS-energy CV
-    "spectral_centroid_stability": (0.08,    0.28),   # spectral-centroid CV
-    "zcr_uniformity":              (0.45,    1.40),   # ZCR CV
+    "pitch_stability":             (0.02,    0.22),   # F0 coefficient of variation — modern TTS can reach 0.10+
+    "spectral_flux_regularity":    (0.25,    1.20),   # spectral-flux CV — modern TTS can reach 0.70+
+    "mfcc_delta_flatness":         (0.50,    2.50),   # MFCC-delta CV — wider to catch subtle uniformity
+    "energy_envelope_flatness":    (0.08,    0.70),   # RMS-energy CV — modern TTS improving at dynamics
+    "spectral_centroid_stability": (0.05,    0.40),   # spectral-centroid CV — wider range
+    "zcr_uniformity":              (0.30,    1.80),   # ZCR CV — wider range
 }
 
 _ACOUSTIC_WEIGHTS: dict[str, float] = {
@@ -210,16 +210,19 @@ def spectrogram_cnn_score(y: np.ndarray, sr: int) -> tuple[float, list[str]]:
 
     # ── Band energy ratio ──────────────────────────────────────────────────
     # TTS often has less natural high-frequency drop-off
-    low_mean = mel_db[:40].mean()    # ~0–2.5 kHz
+    low_mean = mel_db[:40].mean()    # ~0–2.5 kHz  (negative dB values)
     mid_mean = mel_db[40:90].mean()  # ~2.5–5.6 kHz
     high_mean = mel_db[90:].mean()   # 5.6 kHz+
-    # Real speech: high_mean << low_mean (natural roll-off)
-    # TTS: more uniform distribution across bands
-    rolloff_deficit = float(np.clip((high_mean - low_mean + 40) / 40, 0, 1))
-    cnn_scores["band_energy_ratio"] = rolloff_deficit
+    # Real speech: large gap (low_mean - high_mean ≈ 20–40 dB)
+    # TTS: smaller gap (~5–18 dB), more uniform energy across bands
+    band_gap = float(low_mean - high_mean)   # positive = natural roll-off
+    cnn_scores["band_energy_ratio"] = float(np.clip(1.0 - (band_gap - 5) / 30, 0, 1))
 
     # ── Temporal correlation of mel frames ─────────────────────────────────
     # TTS produces frames that are too similar (columns in mel-DB are too correlated)
+    # Note: adjacent mel frames are ALWAYS highly correlated (>0.90) in any
+    # speech, so raw avg_corr is non-discriminative.  We map from the
+    # discriminative range: real ≈ 0.75–0.90, TTS ≈ 0.92–0.99.
     n_frames = min(mel_db.shape[1] - 1, 30)
     if n_frames > 0:
         corrs = []
@@ -227,9 +230,11 @@ def spectrogram_cnn_score(y: np.ndarray, sr: int) -> tuple[float, list[str]]:
             c = float(np.corrcoef(mel_db[:, t], mel_db[:, t + 1])[0, 1])
             if not np.isnan(c):
                 corrs.append(abs(c))
-        avg_corr = float(np.mean(corrs)) if corrs else 0.5
-        # Higher avg_corr → frames are too similar → AI-like
-        cnn_scores["temporal_frame_correlation"] = float(np.clip(avg_corr, 0, 1))
+        avg_corr = float(np.mean(corrs)) if corrs else 0.85
+        # Map [0.75, 0.98] → [0, 1]  where high correlation = AI-like
+        cnn_scores["temporal_frame_correlation"] = float(
+            np.clip((avg_corr - 0.75) / 0.23, 0, 1)
+        )
     else:
         cnn_scores["temporal_frame_correlation"] = 0.5
 
@@ -248,9 +253,10 @@ def spectrogram_cnn_score(y: np.ndarray, sr: int) -> tuple[float, list[str]]:
     # ── Spectral contrast stability ────────────────────────────────────────
     sc_contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_bands=6)
     sc_cv = float(np.std(sc_contrast) / (np.mean(np.abs(sc_contrast)) + 1e-9))
-    # Real speech: higher spectral contrast variation
+    # Real speech: sc_cv typically 0.8–1.5 (more variation)
+    # TTS: sc_cv typically 0.3–0.7 (more uniform contrast)
     cnn_scores["spectral_contrast_stability"] = float(
-        np.clip(1 - sc_cv / 0.45, 0, 1)
+        np.clip(1 - (sc_cv - 0.3) / 1.0, 0, 1)
     )
 
     combined = float(np.mean(list(cnn_scores.values())))
