@@ -30,10 +30,14 @@ logger = logging.getLogger(__name__)
 YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
 SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
 
-# ── Resemble AI Detect (optional — most accurate, requires public HTTPS URL) ──
+# ── Resemble AI Detect (optional — highest accuracy, requires public HTTPS URL)
 RESEMBLE_API_KEY = os.environ.get("RESEMBLE_API_KEY", "").strip()
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000").rstrip("/")
 _RESEMBLE_BASE = "https://app.resemble.ai/api/v2"
+
+# ── AI or Not voice detection (optional — works locally, direct file upload) ──
+AIORNOT_API_KEY = os.environ.get("AIORNOT_API_KEY", "").strip()
+_AIORNOT_URL = "https://api.aiornot.com/v1/reports/voice"
 
 
 async def _resemble_detect(file_id: str) -> tuple[Optional[float], list[float]]:
@@ -126,6 +130,61 @@ async def _resemble_detect(file_id: str) -> tuple[Optional[float], list[float]]:
     except Exception as exc:
         logger.warning("Resemble AI error: %s", exc)
         return None, []
+
+
+async def _aiornot_detect(audio_path: str) -> Optional[float]:
+    """
+    Call AI or Not voice endpoint with a direct file upload.
+
+    Works entirely locally — no public URL required, so this fires on every
+    analyse request regardless of deployment environment.
+
+    Returns ai_probability_0_100 or None if the key is not set / call fails.
+    The verdict "ai" at confidence C → score = C * 100.
+    The verdict "human" at confidence C → score = (1 - C) * 100.
+    """
+    if not AIORNOT_API_KEY:
+        return None
+
+    try:
+        with open(audio_path, "rb") as fh:
+            file_bytes = fh.read()
+
+        ext = os.path.splitext(audio_path)[1].lstrip(".") or "mp3"
+        mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg",
+                "flac": "audio/flac", "m4a": "audio/mp4"}.get(ext, "audio/mpeg")
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                _AIORNOT_URL,
+                headers={"Authorization": f"Bearer {AIORNOT_API_KEY}"},
+                files={"object": (os.path.basename(audio_path), file_bytes, mime)},
+            )
+        resp.raise_for_status()
+        data = resp.json()
+
+        report = data.get("report", {})
+        verdict = report.get("verdict", "")
+        confidence = float(report.get("confidence", 0.5))
+
+        if verdict == "ai":
+            score = confidence * 100.0
+        elif verdict == "human":
+            score = (1.0 - confidence) * 100.0
+        else:
+            logger.warning("AI or Not: unexpected verdict %r", verdict)
+            return None
+
+        logger.info(
+            "AI or Not: %.1f%% AI probability (verdict=%s, confidence=%.3f)",
+            score, verdict, confidence,
+        )
+        return score
+
+    except Exception as exc:
+        logger.warning("AI or Not error: %s", exc)
+        return None
+
 
 app = FastAPI()
 
@@ -234,12 +293,17 @@ async def analyze(file_id: str):
 
     audio_path = os.path.join(UPLOAD_DIR, found)
 
-    # Call Resemble AI before the local pipeline (requires public HTTPS backend)
-    resemble_overall, resemble_chunks = await _resemble_detect(file_id)
+    # Fire both external APIs in parallel (Resemble needs a public URL, AI or Not
+    # works locally via direct file upload).
+    resemble_task = asyncio.create_task(_resemble_detect(file_id))
+    aiornot_task = asyncio.create_task(_aiornot_detect(audio_path))
+    (resemble_overall, resemble_chunks), aiornot_score = await asyncio.gather(
+        resemble_task, aiornot_task
+    )
 
     try:
         detection = await asyncio.get_event_loop().run_in_executor(
-            None, run_detection, audio_path, resemble_overall, resemble_chunks
+            None, run_detection, audio_path, resemble_overall, resemble_chunks, aiornot_score
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))

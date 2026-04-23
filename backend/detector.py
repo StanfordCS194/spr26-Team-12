@@ -436,6 +436,7 @@ def analyze(
     audio_path: str,
     resemble_api_score: Optional[float] = None,
     resemble_chunk_scores: Optional[list[float]] = None,
+    aiornot_score: Optional[float] = None,
 ) -> DetectionResult:
     """
     Full Feature 2 pipeline:
@@ -443,9 +444,10 @@ def analyze(
         2. Score each 3-second segment with the ensemble (2.2)
         3. Aggregate → overall result with CI and verdict (2.3)
 
-    Optional Resemble AI scores (computed in main.py before this call):
-        resemble_api_score     — whole-file score 0–100 (highest accuracy)
+    Optional external API scores (computed in main.py before this call):
+        resemble_api_score     — whole-file score 0–100 (requires public HTTPS URL)
         resemble_chunk_scores  — per-chunk scores aligned to 3-second segments
+        aiornot_score          — whole-file score 0–100 (direct upload, works locally)
     """
     # ── 2.1 Preprocessing ────────────────────────────────────────────────
     y, sr = load_and_preprocess(audio_path)
@@ -459,14 +461,17 @@ def analyze(
         segments = segments[:MAX_SEGMENTS]
 
     # ── Determine which models are active ─────────────────────────────────
-    has_resemble = resemble_api_score is not None
-    has_w2v2    = _get_w2v2_pipe() is not None
-    chunks      = resemble_chunk_scores or []
+    has_resemble  = resemble_api_score is not None
+    has_aiornot   = aiornot_score is not None
+    has_w2v2      = _get_w2v2_pipe() is not None
+    chunks        = resemble_chunk_scores or []
 
     # Build readable model-used string for UI + PDF
     model_parts: list[str] = []
     if has_resemble:
         model_parts.append("Resemble AI Detect")
+    if has_aiornot:
+        model_parts.append("AI or Not")
     if has_w2v2:
         model_parts.append("Wav2Vec2 (dima806)")
     model_parts.append("Acoustic Feature Ensemble + CNN Spectrogram Analysis")
@@ -490,8 +495,8 @@ def analyze(
         resemble_seg = chunks[i] if i < len(chunks) else None
 
         if resemble_seg is not None and w2v2_val is not None:
-            # All tiers: Resemble 45 % + Wav2Vec2 30 % + Acoustic 15 % + CNN 10 %
-            final = 0.45 * resemble_seg + 0.30 * w2v2_val + 0.15 * acou_val + 0.10 * cnn_val
+            # All tiers available: Resemble 40 % + Wav2Vec2 30 % + Acoustic 18 % + CNN 12 %
+            final = 0.40 * resemble_seg + 0.30 * w2v2_val + 0.18 * acou_val + 0.12 * cnn_val
         elif resemble_seg is not None:
             # Resemble + acoustic + CNN: 50 % + 30 % + 20 %
             final = 0.50 * resemble_seg + 0.30 * acou_val + 0.20 * cnn_val
@@ -502,7 +507,7 @@ def analyze(
             final = (w_acou / total) * acou_val + (w_cnn / total) * cnn_val
 
         contributors = _merge_contributors(acou_contrib, cnn_contrib, w2v2_val)
-        # Surface Resemble as a contributor when it drove the segment score
+        # Surface external API scores as contributors when they drove the segment
         if resemble_seg is not None:
             resemble_label = "Resemble AI deepfake detection score"
             if resemble_label not in contributors:
@@ -522,9 +527,21 @@ def analyze(
     scores       = np.array([s.confidence_score for s in seg_results], dtype=np.float64)
     segment_mean = float(np.clip(scores.mean(), 0, 100))
 
-    # Blend Resemble whole-file score (55 %) with segment ensemble mean (45 %)
-    if has_resemble:
+    # Blend external whole-file API scores with the segment ensemble mean.
+    # Priority tiers:
+    #   Both Resemble + AI or Not → weighted average of all three (best accuracy)
+    #   Only Resemble              → 55 % Resemble + 45 % segment mean
+    #   Only AI or Not             → 50 % AI or Not + 50 % segment mean  (no chunk data)
+    #   Neither                    → segment mean only
+    if has_resemble and has_aiornot:
+        overall = float(np.clip(
+            0.40 * resemble_api_score + 0.30 * aiornot_score + 0.30 * segment_mean,
+            0, 100,
+        ))
+    elif has_resemble:
         overall = float(np.clip(0.55 * resemble_api_score + 0.45 * segment_mean, 0, 100))
+    elif has_aiornot:
+        overall = float(np.clip(0.50 * aiornot_score + 0.50 * segment_mean, 0, 100))
     else:
         overall = segment_mean
 
