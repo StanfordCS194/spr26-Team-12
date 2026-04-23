@@ -1,7 +1,12 @@
+import logging
 import os
 import uuid
 import asyncio
 from datetime import datetime
+
+# Load backend/.env before any module reads os.environ
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 import certifi
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -10,11 +15,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from models import (
-    AnalysisResult, SegmentAnalysis, SpeakerMatch,
+    AnalysisResult, SegmentAnalysis,
     ReportRequest, ReportResponse,
 )
 from database import init_db, save_analysis, get_analysis, save_report, get_report
 from report_pdf import generate_pdf
+from detector import analyze as run_detection
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
 SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
@@ -99,43 +108,18 @@ async def preview(file_id: str):
     raise HTTPException(404, "File not found")
 
 
-# ── Mock analysis (stands in for Features 2-4) ───────────────────
-
-MOCK_SEGMENTS = [
-    SegmentAnalysis(
-        start_time=0.0, end_time=3.0, confidence_score=42.0,
-        contributors=["Normal pitch variance", "Natural breath pattern", "Consistent formant transitions"],
-    ),
-    SegmentAnalysis(
-        start_time=3.0, end_time=6.0, confidence_score=78.5,
-        contributors=["Unusual pitch stability", "Spectral smoothing at 3.8kHz", "Missing micro-pauses"],
-    ),
-    SegmentAnalysis(
-        start_time=6.0, end_time=9.0, confidence_score=91.2,
-        contributors=["Synthetic vowel transitions", "Spectral artifact at 4.2kHz", "Unnatural F0 contour"],
-    ),
-    SegmentAnalysis(
-        start_time=9.0, end_time=12.0, confidence_score=88.7,
-        contributors=["TTS boundary artifact", "Flat energy envelope", "Phase discontinuity"],
-    ),
-    SegmentAnalysis(
-        start_time=12.0, end_time=15.0, confidence_score=65.3,
-        contributors=["Moderate pitch regularity", "Slight spectral banding", "Natural trailing off"],
-    ),
-]
-
-MOCK_SUMMARY = (
-    "Segments 3.0s\u201312.0s display spectral characteristics strongly associated with "
-    "neural text-to-speech synthesis, including unusual pitch stability, spectral smoothing "
-    "artifacts, and synthetic vowel transitions. The opening and closing segments show more "
-    "natural acoustic properties, suggesting possible splicing of authentic and synthetic "
-    "audio. Overall AI-generation probability: 87.3%."
-)
+# ── Feature 2: AI/Human Detection Engine ─────────────────────────
 
 
 @app.post("/analyze/{file_id}")
 async def analyze(file_id: str):
-    """Mock analysis — replace internals with real ML pipeline (Features 2-4) when ready."""
+    """
+    Run the real ML detection pipeline (Features 2.1–2.3):
+      · Preprocessing — normalise, trim silence, segment into 3 s windows
+      · Ensemble model — Wav2Vec2 deepfake classifier (primary) +
+                         acoustic feature analyser + CNN spectrogram analyser
+      · Output — per-segment scores, overall probability, verdict, CI
+    """
     try:
         uuid.UUID(file_id)
     except ValueError:
@@ -149,23 +133,38 @@ async def analyze(file_id: str):
     if not found:
         raise HTTPException(404, "File not found")
 
+    audio_path = os.path.join(UPLOAD_DIR, found)
+
+    try:
+        detection = await asyncio.get_event_loop().run_in_executor(
+            None, run_detection, audio_path
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    except Exception as exc:
+        logger.exception("Detection pipeline failed for %s", found)
+        raise HTTPException(500, f"Analysis failed: {exc}")
+
     analysis_id = str(uuid.uuid4())
     result = AnalysisResult(
         analysis_id=analysis_id,
         file_id=file_id,
         filename=found,
-        overall_score=87.3,
-        verdict="Likely AI-Generated",
-        confidence_low=82.1,
-        confidence_high=92.5,
-        segments=MOCK_SEGMENTS,
-        summary=MOCK_SUMMARY,
-        model_used="Wav2Vec 2.0 (fine-tuned) + CNN Spectrogram Ensemble",
-        speaker_match=SpeakerMatch(
-            claimed_speaker="Sen. Jane Smith",
-            similarity_score=34.2,
-            interpretation="Low similarity \u2014 voice does not match reference model",
-        ),
+        overall_score=detection.overall_score,
+        verdict=detection.verdict,
+        confidence_low=detection.confidence_low,
+        confidence_high=detection.confidence_high,
+        segments=[
+            SegmentAnalysis(
+                start_time=s.start_time,
+                end_time=s.end_time,
+                confidence_score=s.confidence_score,
+                contributors=s.contributors,
+            )
+            for s in detection.segments
+        ],
+        summary=detection.summary,
+        model_used=detection.model_used,
         analyzed_at=datetime.utcnow().isoformat() + "Z",
     )
 

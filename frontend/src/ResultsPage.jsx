@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import Heatmap from "./Heatmap";
 
 const API = "http://localhost:8000";
 
@@ -8,29 +9,6 @@ function ScoreBadge({ score }) {
   return <span style={{ color, fontWeight: 700 }}>{score.toFixed(1)}%</span>;
 }
 
-function Heatmap({ segments }) {
-  return (
-    <div className="heatmap">
-      {segments.map((seg, i) => {
-        const pct = seg.confidence_score / 100;
-        const r = Math.round(39 + pct * (192 - 39));
-        const g = Math.round(174 - pct * (174 - 57));
-        const b = Math.round(96 - pct * (96 - 43));
-        return (
-          <div
-            key={i}
-            className="heatmap-segment"
-            style={{ backgroundColor: `rgb(${r},${g},${b})`, flex: 1 }}
-            title={`${seg.start_time.toFixed(1)}s–${seg.end_time.toFixed(1)}s: ${seg.confidence_score.toFixed(1)}%`}
-          >
-            <span className="seg-time">{seg.start_time.toFixed(0)}s</span>
-            <span className="seg-score">{seg.confidence_score.toFixed(0)}%</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function ResultsPage() {
   const { analysisId } = useParams();

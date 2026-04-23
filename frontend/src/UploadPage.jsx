@@ -15,7 +15,11 @@ export default function UploadPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // 0–100 or null
+
   const fileRef = useRef();
+  const dragCounter = useRef(0); // tracks nested drag-enter/leave events
 
   function reset() {
     setFileId(null);
@@ -23,41 +27,99 @@ export default function UploadPage() {
     setPreviewSrc(null);
     setHasPlayed(false);
     setError(null);
+    setUploadProgress(null);
   }
 
-  async function handleFileChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    reset();
-
+  function validateFile(file) {
     const ext = file.name.split(".").pop().toLowerCase();
     if (!ALLOWED_EXTS.includes(ext)) {
-      setError(`Unsupported format. Use: ${ALLOWED_EXTS.join(", ")}`);
-      return;
+      setError(`Unsupported format. Allowed: ${ALLOWED_EXTS.join(", ")}`);
+      return false;
     }
     if (file.size > 100 * 1024 * 1024) {
       setError("File exceeds 100 MB limit");
-      return;
+      return false;
     }
-
-    setPreviewSrc(URL.createObjectURL(file));
-
-    setLoading(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(`${API}/upload`, { method: "POST", body: form });
-      if (!res.ok) throw new Error((await res.json()).detail);
-      const data = await res.json();
-      setFileId(data.file_id);
-      setFilename(data.filename);
-    } catch (err) {
-      setError(err.message);
-      setPreviewSrc(null);
-    } finally {
-      setLoading(false);
-    }
+    return true;
   }
+
+  function handleFile(file) {
+    reset();
+    if (!validateFile(file)) return;
+    setPreviewSrc(URL.createObjectURL(file));
+    uploadFileXHR(file);
+  }
+
+  /**
+   * XHR-based upload so we can track real byte-level progress.
+   */
+  function uploadFileXHR(file) {
+    setLoading(true);
+    setUploadProgress(0);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API}/upload`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setUploadProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      setLoading(false);
+      setUploadProgress(null);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const data = JSON.parse(xhr.responseText);
+        setFileId(data.file_id);
+        setFilename(data.filename);
+      } else {
+        const detail =
+          (JSON.parse(xhr.responseText) || {}).detail || "Upload failed";
+        setError(detail);
+        setPreviewSrc(null);
+      }
+    };
+
+    xhr.onerror = () => {
+      setLoading(false);
+      setUploadProgress(null);
+      setError("Upload failed — check your connection");
+      setPreviewSrc(null);
+    };
+
+    const form = new FormData();
+    form.append("file", file);
+    xhr.send(form);
+  }
+
+  // ── Drag-and-drop handlers ──────────────────────────────────────
+
+  function handleDragEnter(e) {
+    e.preventDefault();
+    dragCounter.current += 1;
+    setDragging(true);
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault(); // required to allow drop
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault();
+    dragCounter.current -= 1;
+    if (dragCounter.current === 0) setDragging(false);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  // ── URL ingestion ───────────────────────────────────────────────
 
   async function handleUrlSubmit(e) {
     e.preventDefault();
@@ -86,6 +148,8 @@ export default function UploadPage() {
     }
   }
 
+  // ── Analysis submission ─────────────────────────────────────────
+
   async function handleSubmit() {
     setAnalyzing(true);
     setError(null);
@@ -109,30 +173,69 @@ export default function UploadPage() {
       <div className="tabs">
         <button
           className={mode === "file" ? "active" : ""}
-          onClick={() => { setMode("file"); reset(); }}
+          onClick={() => {
+            setMode("file");
+            reset();
+            dragCounter.current = 0;
+            setDragging(false);
+          }}
         >
           Upload File
         </button>
         <button
           className={mode === "url" ? "active" : ""}
-          onClick={() => { setMode("url"); reset(); }}
+          onClick={() => {
+            setMode("url");
+            reset();
+          }}
         >
           Paste URL
         </button>
       </div>
 
       {mode === "file" && (
-        <div className="upload-area" onClick={() => fileRef.current.click()}>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="audio/*"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-          />
-          <p>Click to select an audio file</p>
-          <p className="hint">MP3, MP4, WAV, OGG, M4A &mdash; max 100 MB</p>
-        </div>
+        <>
+          <div
+            className={`upload-area${dragging ? " drag-over" : ""}`}
+            onClick={() => fileRef.current.click()}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) handleFile(file);
+                e.target.value = ""; // reset so same file can be re-selected
+              }}
+            />
+            {dragging ? (
+              <p className="drag-label">Drop your audio file here</p>
+            ) : (
+              <>
+                <p>Drag &amp; drop or click to select an audio file</p>
+                <p className="hint">MP3, MP4, WAV, OGG, M4A &mdash; max 100 MB</p>
+              </>
+            )}
+          </div>
+
+          {uploadProgress !== null && (
+            <div className="upload-progress-wrapper">
+              <div
+                className="upload-progress-bar"
+                style={{ width: `${uploadProgress}%` }}
+              />
+              <span className="upload-progress-label">
+                Uploading&hellip; {uploadProgress}%
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {mode === "url" && (
@@ -149,7 +252,10 @@ export default function UploadPage() {
         </form>
       )}
 
-      {loading && <p className="status">Processing...</p>}
+      {/* Generic loading indicator for URL ingestion (no progress bar) */}
+      {loading && uploadProgress === null && (
+        <p className="status">Processing...</p>
+      )}
       {error && <p className="error">{error}</p>}
 
       {previewSrc && (
@@ -167,10 +273,10 @@ export default function UploadPage() {
             onClick={handleSubmit}
           >
             {analyzing
-              ? "Analyzing..."
+              ? "Analyzing\u2026 (up to 45 s)"
               : !hasPlayed
-                ? "Play audio to enable submit"
-                : "Submit for Analysis"}
+              ? "Play audio to enable submit"
+              : "Submit for Analysis"}
           </button>
         </div>
       )}

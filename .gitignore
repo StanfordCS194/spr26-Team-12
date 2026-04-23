@@ -7,6 +7,10 @@ __pycache__/
 frontend/node_modules/
 frontend/dist/
 
+# Secrets
+backend/.env
+.env
+
 # Database
 backend/veritas.db
 

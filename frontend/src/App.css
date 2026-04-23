@@ -52,6 +52,18 @@ h1 {
   border-color: #8b1a1a;
 }
 
+.upload-area.drag-over {
+  border-color: #8b1a1a;
+  background: #fff5f5;
+}
+
+.drag-label {
+  font-size: 16px;
+  color: #8b1a1a;
+  font-weight: 600;
+  margin: 0;
+}
+
 .upload-area p {
   margin: 4px 0;
 }
@@ -87,6 +99,35 @@ h1 {
 .url-form button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.upload-progress-wrapper {
+  position: relative;
+  height: 26px;
+  background: #f0f0f0;
+  border-radius: 13px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background: #8b1a1a;
+  border-radius: 13px;
+  transition: width 0.15s ease;
+  min-width: 2px;
+}
+
+.upload-progress-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .status {
@@ -228,6 +269,10 @@ audio {
 
 /* ── heatmap ───────────────────────────────────────────────── */
 
+.heatmap-wrapper {
+  position: relative;
+}
+
 .heatmap {
   display: flex;
   border-radius: 6px;
@@ -245,16 +290,89 @@ audio {
   font-size: 11px;
   font-weight: 600;
   cursor: default;
-  transition: opacity 0.15s;
+  transition: filter 0.15s;
 }
 
 .heatmap-segment:hover {
-  opacity: 0.85;
+  filter: brightness(1.12);
 }
 
 .seg-time {
   font-size: 10px;
   opacity: 0.8;
+}
+
+.seg-score {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── heatmap tooltip (fixed-position, pointer-following) ────── */
+
+.heatmap-tooltip {
+  position: fixed;
+  transform: translateX(-50%) translateY(calc(-100% - 14px));
+  background: rgba(12, 12, 12, 0.94);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  max-width: 300px;
+  pointer-events: none;
+  z-index: 1000;
+  line-height: 1.5;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.heatmap-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: rgba(12, 12, 12, 0.94);
+}
+
+.tooltip-time-range {
+  font-weight: 700;
+  font-size: 11px;
+  opacity: 0.65;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.tooltip-probability {
+  margin-bottom: 8px;
+}
+
+.tooltip-contributors {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 6px;
+}
+
+.tooltip-contrib-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.55;
+  margin-bottom: 3px;
+}
+
+.tooltip-contributor {
+  font-size: 11px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+/* ── heatmap legend ─────────────────────────────────────────── */
+
+.heatmap-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #666;
 }
 
 /* ── segments table ────────────────────────────────────────── */
