@@ -55,25 +55,27 @@ Copy `backend/.env.example` to `backend/.env` and fill in as needed. All values 
 |----------|----------|-------------|
 | `SUPABASE_URL` | Optional | Cloud-persists analyses + reports. Falls back to local SQLite. |
 | `SUPABASE_KEY` | Optional | Service-role key from your Supabase project settings. |
-| `RESEMBLE_API_KEY` | Optional | **Significantly improves accuracy.** Get free key at [app.resemble.ai/account/api](https://app.resemble.ai/account/api). |
+| `RESEMBLE_API_KEY` | Optional | Boosts accuracy on deployed servers. Get free key at [app.resemble.ai/account/api](https://app.resemble.ai/account/api). |
 | `BACKEND_URL` | Optional | Public HTTPS URL of the deployed backend (e.g. `https://your-domain.com`). Resemble requires this to fetch audio. Skipped automatically for `http://`. |
+| `AIORNOT_API_KEY` | Optional | **Works locally** (direct file upload). Boosts accuracy on every request. Get free key at [aiornot.com/dashboard/api](https://www.aiornot.com/dashboard/api). |
 
-**Note:** Resemble AI requires the backend to be publicly accessible via HTTPS so it can fetch the audio. During local development, Resemble is automatically skipped and the local Wav2Vec2 + acoustic ensemble runs instead.
+**Note:** AI or Not works in local development (no public URL needed). Resemble AI is skipped locally and activates automatically on deployment.
 
 ---
 
 ## Detection Architecture
 
-Four-tier ensemble — highest accuracy to fastest fallback:
+Five-tier ensemble — highest accuracy to fastest fallback:
 
 | Tier | Model | Weight | When Active |
 |------|-------|--------|-------------|
-| 1 | **Resemble AI Detect** (cloud API) | 55% overall + per-segment | `RESEMBLE_API_KEY` + public HTTPS backend |
-| 2 | **Wav2Vec2** (`dima806/deepfake-vs-real-audio-detection`) | 60% of segments (no Resemble) | Local, lazy-loads on first `/analyze` |
-| 3 | **Acoustic Features** (MFCC delta, pitch jitter, spectral flux, RMS, ZCR) | Always | Local, instant |
-| 4 | **CNN Spectrogram** (band energy, temporal correlation, harmonic cleanness) | Always | Local, instant |
+| 1 | **Resemble AI Detect** (cloud API) | 40% overall + per-segment | `RESEMBLE_API_KEY` + public HTTPS backend |
+| 2 | **AI or Not** (cloud API, direct upload) | 30% overall | `AIORNOT_API_KEY` — works locally |
+| 3 | **Wav2Vec2** (`dima806/deepfake-vs-real-audio-detection`) | 60% of segments (no cloud APIs) | Local, lazy-loads on first `/analyze` |
+| 4 | **Acoustic Features** (MFCC delta, pitch jitter, spectral flux, RMS, ZCR) | Always | Local, instant |
+| 5 | **CNN Spectrogram** (band energy, temporal correlation, harmonic cleanness) | Always | Local, instant |
 
-All tiers run per 3-second segment so the confidence heatmap always has data. The Resemble `frame_length=3` parameter aligns its chunks exactly to our preprocessing windows.
+Resemble and AI or Not fire in parallel so they add zero latency penalty. The Resemble `frame_length=3` parameter aligns its per-chunk scores to our 3-second preprocessing windows for heatmap accuracy.
 
 ---
 
@@ -134,14 +136,18 @@ All tiers run per 3-second segment so the confidence heatmap always has data. Th
 | Frontend | React 19, Vite, React Router 7 |
 | Backend | Python 3.10+, FastAPI, Uvicorn |
 | Database | Supabase Postgres (primary) + SQLite (fallback) |
-| Detection API | Resemble AI Detect (optional, highest accuracy) |
+| Detection APIs | Resemble AI Detect + AI or Not (optional, boost accuracy) |
 | ML Models | Wav2Vec2 (HuggingFace), PyTorch, Transformers, Accelerate |
 | Audio Features | Librosa, SciPy, NumPy |
 | Audio Extraction | yt-dlp, ffmpeg |
 | PDF Generation | fpdf2 |
-| HTTP Client | httpx (async, for Resemble API) |
+| HTTP Client | httpx (async, for external APIs) |
 
 ---
 
+
 ## Source Control
 git: Agam Iheanyi-Igwe (agam01)
+
+Henok Tewolde
+Kamal Eissa
