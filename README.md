@@ -58,7 +58,7 @@ Right-click any audio on a webpage to check it.
 | Audio Extraction | yt-dlp, ffmpeg |
 
 ## Requirements
-- Python 3.12+
+- Python 3.10+
 - Node 18+
 - ffmpeg (`brew install ffmpeg`)
 - Supabase project (free tier works)
@@ -79,6 +79,8 @@ python3 -m venv venv
 venv/bin/pip install fastapi uvicorn python-multipart yt-dlp certifi fpdf2 supabase python-dotenv matplotlib
 venv/bin/uvicorn main:app --reload
 ```
+
+The Wav2Vec2 deepfake detection model (~400 MB) downloads automatically from HuggingFace on the first `/analyze` call. Subsequent runs use the local cache. Analysis without the model (acoustic-only fallback) works immediately.
 
 ### Frontend
 ```bash
