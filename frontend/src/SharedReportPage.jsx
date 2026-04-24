@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import Heatmap from "./Heatmap";
 
 const API = "http://localhost:8000";
 
@@ -73,27 +74,7 @@ export default function SharedReportPage() {
       {/* heatmap */}
       <div className="section">
         <h2>Confidence Heatmap</h2>
-        <div className="heatmap">
-          {analysis.segments.map((seg, i) => {
-            const pct = seg.confidence_score / 100;
-            const r = Math.round(39 + pct * (192 - 39));
-            const g = Math.round(174 - pct * (174 - 57));
-            const b = Math.round(96 - pct * (96 - 43));
-            return (
-              <div
-                key={i}
-                className="heatmap-segment"
-                style={{ backgroundColor: `rgb(${r},${g},${b})`, flex: 1 }}
-                title={`${seg.start_time.toFixed(1)}s–${seg.end_time.toFixed(1)}s: ${seg.confidence_score.toFixed(1)}%`}
-              >
-                <span className="seg-time">{seg.start_time.toFixed(0)}s</span>
-                <span className="seg-score">
-                  {seg.confidence_score.toFixed(0)}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        <Heatmap segments={analysis.segments} />
       </div>
 
       {/* summary */}

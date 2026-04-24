@@ -1,8 +1,13 @@
+import logging
 import os
 import uuid
 import asyncio
 from datetime import datetime
 from typing import Optional
+
+# Load backend/.env before any module reads os.environ
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 import certifi
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -11,7 +16,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from models import (
-    AnalysisResult, SegmentAnalysis, SpeakerMatch,
+    AnalysisResult, SegmentAnalysis,
     ReportRequest, ReportResponse,
 )
 from database import (
@@ -20,6 +25,10 @@ from database import (
 )
 from report_pdf import generate_pdf
 import speaker_match
+from detector import analyze as run_detection
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
 SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
@@ -118,38 +127,7 @@ async def preview(file_id: str):
     raise HTTPException(404, "File not found")
 
 
-# ── Mock analysis (stands in for Features 2-4) ───────────────────
-
-MOCK_SEGMENTS = [
-    SegmentAnalysis(
-        start_time=0.0, end_time=3.0, confidence_score=42.0,
-        contributors=["Normal pitch variance", "Natural breath pattern", "Consistent formant transitions"],
-    ),
-    SegmentAnalysis(
-        start_time=3.0, end_time=6.0, confidence_score=78.5,
-        contributors=["Unusual pitch stability", "Spectral smoothing at 3.8kHz", "Missing micro-pauses"],
-    ),
-    SegmentAnalysis(
-        start_time=6.0, end_time=9.0, confidence_score=91.2,
-        contributors=["Synthetic vowel transitions", "Spectral artifact at 4.2kHz", "Unnatural F0 contour"],
-    ),
-    SegmentAnalysis(
-        start_time=9.0, end_time=12.0, confidence_score=88.7,
-        contributors=["TTS boundary artifact", "Flat energy envelope", "Phase discontinuity"],
-    ),
-    SegmentAnalysis(
-        start_time=12.0, end_time=15.0, confidence_score=65.3,
-        contributors=["Moderate pitch regularity", "Slight spectral banding", "Natural trailing off"],
-    ),
-]
-
-MOCK_SUMMARY = (
-    "Segments 3.0s\u201312.0s display spectral characteristics strongly associated with "
-    "neural text-to-speech synthesis, including unusual pitch stability, spectral smoothing "
-    "artifacts, and synthetic vowel transitions. The opening and closing segments show more "
-    "natural acoustic properties, suggesting possible splicing of authentic and synthetic "
-    "audio. Overall AI-generation probability: 87.3%."
-)
+# ── Feature 2: AI/Human Detection Engine ─────────────────────────
 
 
 # ── Feature 4: Politician Identity Matching ───────────────────────
@@ -167,7 +145,11 @@ class AnalyzeRequest(BaseModel):
 
 @app.post("/analyze/{file_id}")
 async def analyze(file_id: str, req: Optional[AnalyzeRequest] = None):
-    """Mock detection (Features 2-3) + real speaker matching (Feature 4)."""
+    """
+    Run the real ML detection pipeline (Features 2.1–2.3) and, if a
+    `claimed_speaker_id` is supplied in the body, the Feature-4 speaker-
+    identity match against the stored reference centroid.
+    """
     try:
         uuid.UUID(file_id)
     except ValueError:
@@ -183,8 +165,19 @@ async def analyze(file_id: str, req: Optional[AnalyzeRequest] = None):
 
     audio_path = os.path.join(UPLOAD_DIR, found)
 
+    # Features 2.1–2.3: real ML detection.
+    try:
+        detection = await asyncio.get_event_loop().run_in_executor(
+            None, run_detection, audio_path
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    except Exception as exc:
+        logger.exception("Detection pipeline failed for %s", found)
+        raise HTTPException(500, f"Analysis failed: {exc}")
+
     # Feature 4: real speaker matching, only if a speaker was claimed.
-    sm: Optional[SpeakerMatch] = None
+    sm = None
     claimed_id = req.claimed_speaker_id if req else None
     if claimed_id:
         if get_speaker(claimed_id) is None:
@@ -196,20 +189,28 @@ async def analyze(file_id: str, req: Optional[AnalyzeRequest] = None):
             raise HTTPException(400, str(e))
         except Exception as e:
             # Don't fail the whole analysis if speaker matching breaks.
-            print(f"[warn] speaker_match.compare failed: {e}")
+            logger.warning("speaker_match.compare failed: %s", e)
 
     analysis_id = str(uuid.uuid4())
     result = AnalysisResult(
         analysis_id=analysis_id,
         file_id=file_id,
         filename=found,
-        overall_score=87.3,
-        verdict="Likely AI-Generated",
-        confidence_low=82.1,
-        confidence_high=92.5,
-        segments=MOCK_SEGMENTS,
-        summary=MOCK_SUMMARY,
-        model_used="Wav2Vec 2.0 (fine-tuned) + CNN Spectrogram Ensemble",
+        overall_score=detection.overall_score,
+        verdict=detection.verdict,
+        confidence_low=detection.confidence_low,
+        confidence_high=detection.confidence_high,
+        segments=[
+            SegmentAnalysis(
+                start_time=s.start_time,
+                end_time=s.end_time,
+                confidence_score=s.confidence_score,
+                contributors=s.contributors,
+            )
+            for s in detection.segments
+        ],
+        summary=detection.summary,
+        model_used=detection.model_used,
         speaker_match=sm,
         analyzed_at=datetime.utcnow().isoformat() + "Z",
     )
