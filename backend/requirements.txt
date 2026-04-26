@@ -16,6 +16,10 @@ supabase>=2.0
 yt-dlp>=2024.3
 certifi
 
+# ── AI / Fact-checking ───────────────────────────────────────────
+openai-whisper
+groq>=0.9
+
 # ── PDF generation ───────────────────────────────────────────────
 fpdf2>=2.7
 

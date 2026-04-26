@@ -169,11 +169,13 @@ def acoustic_score(y: np.ndarray, sr: int) -> tuple[float, list[str]]:
     Return (ai_probability_0_100, top_3_contributors) from acoustic features.
     """
     raw = _acoustic_features(y, sr)
+    logger.info("acoustic raw features: %s", {k: round(v, 4) for k, v in raw.items()})
 
     scored: dict[str, float] = {
         name: _linear_score(raw[name], *_ACOUSTIC_THRESHOLDS[name])
         for name in _ACOUSTIC_THRESHOLDS
     }
+    logger.info("acoustic scored features: %s", {k: round(v, 3) for k, v in scored.items()})
 
     total_weight = sum(_ACOUSTIC_WEIGHTS.values())
     combined = sum(scored[k] * _ACOUSTIC_WEIGHTS[k] for k in scored) / total_weight
@@ -286,7 +288,7 @@ def spectrogram_cnn_score(y: np.ndarray, sr: int) -> tuple[float, list[str]]:
 
 _W2V2_PIPE = None
 _W2V2_ATTEMPTED = False
-_W2V2_MODEL = "dima806/deepfake-vs-real-audio-detection"
+_W2V2_MODEL = "MelodyMachine/Deepfake-audio-detection-V2"
 
 
 def _get_w2v2_pipe():
@@ -324,6 +326,7 @@ def wav2vec2_score(y: np.ndarray, sr: int) -> Optional[float]:
         return None
     try:
         results = pipe({"array": y.astype(np.float32), "sampling_rate": int(sr)})
+        logger.info("wav2vec2 raw output: %s", results)
         # Expect labels "FAKE" / "REAL" (model-dependent capitalisation)
         for r in results:
             if r["label"].upper() in ("FAKE", "SPOOF", "AI"):
@@ -332,6 +335,7 @@ def wav2vec2_score(y: np.ndarray, sr: int) -> Optional[float]:
         for r in results:
             if r["label"].upper() in ("REAL", "HUMAN", "GENUINE"):
                 return float((1 - r["score"]) * 100)
+        logger.warning("wav2vec2 labels not recognised: %s", [r["label"] for r in results])
         return None
     except Exception as exc:
         logger.debug("wav2vec2 inference error: %s", exc)
@@ -474,9 +478,15 @@ def analyze(audio_path: str) -> DetectionResult:
         if w2v2_val is not None:
             final = w_w2v2 * w2v2_val + w_acou * acou_val + w_cnn * cnn_val
         else:
-            # Redistribute wav2vec2 weight proportionally if it failed mid-run
             total_fallback = w_acou + w_cnn
             final = (w_acou / total_fallback) * acou_val + (w_cnn / total_fallback) * cnn_val
+        logger.info(
+            "seg %.1f-%.1fs | acou=%.1f cnn=%.1f w2v2=%s final=%.1f",
+            seg.start_time, seg.end_time,
+            acou_val, cnn_val,
+            f"{w2v2_val:.1f}" if w2v2_val is not None else "N/A",
+            final,
+        )
 
         contributors = _merge_contributors(acou_contrib, cnn_contrib, w2v2_val)
 

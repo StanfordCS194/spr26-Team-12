@@ -10,8 +10,9 @@ export default function UploadPage() {
   const [fileId, setFileId] = useState(null);
   const [filename, setFilename] = useState(null);
   const [previewSrc, setPreviewSrc] = useState(null);
-  const [hasPlayed, setHasPlayed] = useState(false);
   const [url, setUrl] = useState("");
+  const [speaker, setSpeaker] = useState("");
+  const [date, setDate] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -25,7 +26,6 @@ export default function UploadPage() {
     setFileId(null);
     setFilename(null);
     setPreviewSrc(null);
-    setHasPlayed(false);
     setError(null);
     setUploadProgress(null);
   }
@@ -154,7 +154,14 @@ export default function UploadPage() {
     setAnalyzing(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/analyze/${fileId}`, { method: "POST" });
+      const res = await fetch(`${API}/analyze/${fileId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          speaker: speaker.trim() || null,
+          date: date.trim() || null,
+        }),
+      });
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
       navigate(`/results/${data.analysis_id}`);
@@ -168,7 +175,7 @@ export default function UploadPage() {
   return (
     <div className="veritas-container">
       <h1>Veritas</h1>
-      <p className="subtitle">AI Voice Authentication Platform</p>
+      <p className="subtitle">Political Audio Fact-Checker</p>
 
       <div className="tabs">
         <button
@@ -261,22 +268,27 @@ export default function UploadPage() {
       {previewSrc && (
         <div className="preview">
           <p className="filename">{filename}</p>
-          <audio
-            controls
-            src={previewSrc}
-            onPlay={() => setHasPlayed(true)}
-            onPlaying={() => setHasPlayed(true)}
-          />
+          <audio controls src={previewSrc} />
+          <div className="context-fields">
+            <input
+              type="text"
+              placeholder="Speaker (optional, e.g. Donald Trump)"
+              value={speaker}
+              onChange={(e) => setSpeaker(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Date (optional, e.g. January 2020)"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
           <button
             className="submit-btn"
-            disabled={!hasPlayed || !fileId || analyzing}
+            disabled={!fileId || analyzing}
             onClick={handleSubmit}
           >
-            {analyzing
-              ? "Analyzing\u2026 (up to 45 s)"
-              : !hasPlayed
-              ? "Play audio to enable submit"
-              : "Submit for Analysis"}
+            {analyzing ? "Analyzing\u2026 (up to 45 s)" : "Submit for Analysis"}
           </button>
         </div>
       )}

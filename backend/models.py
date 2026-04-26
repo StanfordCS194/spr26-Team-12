@@ -23,6 +23,21 @@ class SpeakerMatch(BaseModel):
     interpretation: str
 
 
+class FactClaim(BaseModel):
+    claim: str
+    verdict: str        # "Verified" | "False" | "Unverifiable" | "Misleading"
+    explanation: str
+    sources: list[str]
+
+
+class FactCheck(BaseModel):
+    transcript: str
+    claimed_speaker: Optional[str] = None
+    claims: list[FactClaim]
+    consistency_score: float  # 0-100, how consistent with public record
+    summary: str
+
+
 class AnalysisResult(BaseModel):
     analysis_id: str
     file_id: str
@@ -35,6 +50,7 @@ class AnalysisResult(BaseModel):
     summary: str
     model_used: str
     speaker_match: Optional[SpeakerMatch] = None
+    fact_check: Optional[FactCheck] = None
     analyzed_at: str  # ISO-8601
 
 

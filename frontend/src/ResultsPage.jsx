@@ -1,14 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import Heatmap from "./Heatmap";
 
 const API = "http://localhost:8000";
-
-function ScoreBadge({ score }) {
-  const color = score >= 50 ? "#c0392b" : "#27ae60";
-  return <span style={{ color, fontWeight: 700 }}>{score.toFixed(1)}%</span>;
-}
-
 
 export default function ResultsPage() {
   const { analysisId } = useParams();
@@ -73,90 +66,61 @@ export default function ResultsPage() {
 
   if (!analysis) return null;
 
-  const scoreColor = analysis.overall_score >= 50 ? "#c0392b" : "#27ae60";
+  const fc = analysis.fact_check;
+  const scoreColor = fc && fc.consistency_score >= 60 ? "#27ae60" : "#c0392b";
 
   return (
     <div className="veritas-container results-page">
       <Link to="/" className="back-link">&larr; New Analysis</Link>
 
       <h1>Veritas</h1>
-      <p className="subtitle">Analysis Results</p>
+      <p className="subtitle">Political Audio Fact-Checker</p>
 
       {/* verdict */}
-      <div className="verdict-card">
-        <div className="verdict-label">Verdict</div>
-        <div className="verdict-text" style={{ color: scoreColor }}>
-          {analysis.verdict}
-        </div>
-        <div className="verdict-score">
-          <span className="score-big" style={{ color: scoreColor }}>
-            {analysis.overall_score.toFixed(1)}%
-          </span>
-          <span className="score-label">AI Probability</span>
-        </div>
-        <div className="confidence-interval">
-          Confidence: {analysis.confidence_low.toFixed(1)}% &ndash;{" "}
-          {analysis.confidence_high.toFixed(1)}%
-        </div>
-      </div>
-
-      {/* heatmap */}
-      <div className="section">
-        <h2>Confidence Heatmap</h2>
-        <Heatmap segments={analysis.segments} />
-      </div>
-
-      {/* summary */}
-      <div className="section">
-        <h2>Summary</h2>
-        <p className="summary-text">{analysis.summary}</p>
-      </div>
-
-      {/* segments table */}
-      <div className="section">
-        <h2>Segment Details</h2>
-        <table className="segments-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Score</th>
-              <th>Contributors</th>
-            </tr>
-          </thead>
-          <tbody>
-            {analysis.segments.map((seg, i) => (
-              <tr key={i}>
-                <td>
-                  {seg.start_time.toFixed(1)}s &ndash; {seg.end_time.toFixed(1)}s
-                </td>
-                <td>
-                  <ScoreBadge score={seg.confidence_score} />
-                </td>
-                <td>{seg.contributors.join(", ")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* speaker match */}
-      {analysis.speaker_match && (
-        <div className="section">
-          <h2>Speaker Identity Match</h2>
-          <div className="speaker-match">
-            <div>
-              <strong>Claimed Speaker:</strong>{" "}
-              {analysis.speaker_match.claimed_speaker}
-            </div>
-            <div>
-              <strong>Similarity:</strong>{" "}
-              {analysis.speaker_match.similarity_score.toFixed(1)}%
-            </div>
-            <div>
-              <strong>Interpretation:</strong>{" "}
-              {analysis.speaker_match.interpretation}
-            </div>
+      {fc && (
+        <div className="verdict-card">
+          <div className="verdict-label">Verdict</div>
+          <div className="verdict-text" style={{ color: scoreColor }}>
+            {analysis.verdict}
           </div>
+          <div className="verdict-score">
+            <span className="score-big" style={{ color: scoreColor }}>
+              {fc.consistency_score.toFixed(0)}%
+            </span>
+            <span className="score-label">Factual Consistency</span>
+          </div>
+        </div>
+      )}
+
+      {/* fact check claims */}
+      {fc && (
+        <div className="section">
+          <h2>Fact-Check Results</h2>
+          <p className="summary-text">{fc.summary}</p>
+
+          {fc.claims.length > 0 && (
+            <div className="claims-list">
+              {fc.claims.map((claim, i) => (
+                <div key={i} className={`claim-card claim-${claim.verdict.toLowerCase()}`}>
+                  <div className="claim-header">
+                    <span className="claim-verdict">{claim.verdict}</span>
+                    <span className="claim-text">"{claim.claim}"</span>
+                  </div>
+                  <p className="claim-explanation">{claim.explanation}</p>
+                  {claim.sources.length > 0 && (
+                    <p className="claim-sources">
+                      <strong>Sources:</strong> {claim.sources.join(", ")}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <details className="transcript-toggle">
+            <summary>View Full Transcript</summary>
+            <p className="transcript-text">{fc.transcript}</p>
+          </details>
         </div>
       )}
 

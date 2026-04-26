@@ -34,7 +34,7 @@ export default function SharedReportPage() {
       <div className="veritas-container">
         <div className="expired-notice">
           <h1>Veritas</h1>
-          <p className="subtitle">AI Voice Authentication Platform</p>
+          <p className="subtitle">Political Audio Fact-Checker</p>
           <p className="error">{error}</p>
         </div>
       </div>
@@ -51,7 +51,7 @@ export default function SharedReportPage() {
       <div className="shared-banner">Shared Report &mdash; Read Only</div>
 
       <h1>Veritas</h1>
-      <p className="subtitle">AI Voice Authentication Report</p>
+      <p className="subtitle">Political Audio Fact-Check Report</p>
 
       {/* verdict */}
       <div className="verdict-card">

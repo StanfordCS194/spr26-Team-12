@@ -148,6 +148,22 @@ h1 {
   gap: 12px;
 }
 
+.context-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.context-fields input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
 .filename {
   font-size: 13px;
   color: #555;
@@ -264,7 +280,7 @@ audio {
 
 .summary-text {
   line-height: 1.6;
-  color: #333;
+  color: #fff;
 }
 
 /* ── heatmap ───────────────────────────────────────────────── */
@@ -422,6 +438,97 @@ audio {
 
 .meta-info p {
   margin: 4px 0;
+}
+
+/* ── fact check ────────────────────────────────────────────── */
+
+.fact-check-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.fact-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.claims-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.claim-card {
+  border-left: 4px solid #555;
+  padding: 10px 14px;
+  background: #1a1a1a;
+  border-radius: 0 6px 6px 0;
+}
+
+.claim-card.claim-verified   { border-color: #27ae60; }
+.claim-card.claim-false      { border-color: #c0392b; }
+.claim-card.claim-misleading { border-color: #e67e22; }
+.claim-card.claim-unverifiable { border-color: #7f8c8d; }
+
+.claim-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.claim-verdict {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  white-space: nowrap;
+}
+
+.claim-text {
+  font-style: italic;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.claim-explanation {
+  font-size: 0.85rem;
+  color: #bbb;
+  margin: 4px 0;
+}
+
+.claim-sources {
+  font-size: 0.78rem;
+  color: #888;
+  margin: 4px 0 0;
+}
+
+.transcript-toggle {
+  margin-top: 12px;
+  cursor: pointer;
+}
+
+.transcript-toggle summary {
+  color: #888;
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.transcript-text {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #aaa;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 /* ── export / report actions ───────────────────────────────── */

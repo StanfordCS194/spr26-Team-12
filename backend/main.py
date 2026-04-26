@@ -15,12 +15,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from models import (
-    AnalysisResult, SegmentAnalysis,
+    AnalysisResult, FactCheck, FactClaim,
     ReportRequest, ReportResponse,
 )
 from database import init_db, save_analysis, get_analysis, save_report, get_report
 from report_pdf import generate_pdf
-from detector import analyze as run_detection
+from fact_checker import transcribe, fact_check
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -83,12 +83,15 @@ async def ingest_url(req: URLRequest):
     out_path = os.path.join(UPLOAD_DIR, f"{file_id}.mp3")
 
     proc = await asyncio.create_subprocess_exec(
-        YTDLP, "-x", "--audio-format", "mp3", "-o", out_path, req.url,
+        YTDLP, "-x", "--audio-format", "mp3",
+        "--extractor-args", "youtube:player_client=android",
+        "-o", out_path, req.url,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         env=SSL_ENV,
     )
-    await asyncio.wait_for(proc.communicate(), timeout=120)
+    _, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
     if proc.returncode != 0:
+        logger.error("yt-dlp failed: %s", stderr.decode(errors="replace"))
         raise HTTPException(400, "Could not extract audio from URL")
 
     return {"file_id": file_id, "filename": req.url.split("/")[-1]}
@@ -111,15 +114,13 @@ async def preview(file_id: str):
 # ── Feature 2: AI/Human Detection Engine ─────────────────────────
 
 
+class AnalyzeRequest(BaseModel):
+    speaker: str | None = None
+    date: str | None = None
+
+
 @app.post("/analyze/{file_id}")
-async def analyze(file_id: str):
-    """
-    Run the real ML detection pipeline (Features 2.1–2.3):
-      · Preprocessing — normalise, trim silence, segment into 3 s windows
-      · Ensemble model — Wav2Vec2 deepfake classifier (primary) +
-                         acoustic feature analyser + CNN spectrogram analyser
-      · Output — per-segment scores, overall probability, verdict, CI
-    """
+async def analyze(file_id: str, req: AnalyzeRequest = AnalyzeRequest()):
     try:
         uuid.UUID(file_id)
     except ValueError:
@@ -135,36 +136,48 @@ async def analyze(file_id: str):
 
     audio_path = os.path.join(UPLOAD_DIR, found)
 
+    claimed_speaker = req.speaker or None
+    claimed_date = req.date or None
     try:
-        detection = await asyncio.get_event_loop().run_in_executor(
-            None, run_detection, audio_path
+        transcript = await asyncio.get_event_loop().run_in_executor(
+            None, transcribe, audio_path
         )
-    except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        fc_raw = await asyncio.get_event_loop().run_in_executor(
+            None, fact_check, transcript, claimed_speaker, claimed_date
+        ) if transcript else None
     except Exception as exc:
-        logger.exception("Detection pipeline failed for %s", found)
+        logger.exception("Fact-check pipeline failed for %s", found)
         raise HTTPException(500, f"Analysis failed: {exc}")
+
+    fact_check_result = None
+    if fc_raw:
+        try:
+            fact_check_result = FactCheck(
+                transcript=fc_raw.get("transcript", transcript or ""),
+                claimed_speaker=fc_raw.get("claimed_speaker"),
+                claims=[FactClaim(**c) for c in fc_raw.get("claims", [])],
+                consistency_score=float(fc_raw.get("consistency_score", 50)),
+                summary=fc_raw.get("summary", ""),
+            )
+        except Exception as exc:
+            logger.warning("FactCheck model validation failed: %s", exc)
+
+    if not fact_check_result:
+        raise HTTPException(500, "Could not transcribe or fact-check audio")
 
     analysis_id = str(uuid.uuid4())
     result = AnalysisResult(
         analysis_id=analysis_id,
         file_id=file_id,
         filename=found,
-        overall_score=detection.overall_score,
-        verdict=detection.verdict,
-        confidence_low=detection.confidence_low,
-        confidence_high=detection.confidence_high,
-        segments=[
-            SegmentAnalysis(
-                start_time=s.start_time,
-                end_time=s.end_time,
-                confidence_score=s.confidence_score,
-                contributors=s.contributors,
-            )
-            for s in detection.segments
-        ],
-        summary=detection.summary,
-        model_used=detection.model_used,
+        overall_score=fact_check_result.consistency_score,
+        verdict="Consistent with Public Record" if fact_check_result.consistency_score >= 60 else "Inconsistent with Public Record",
+        confidence_low=max(0, fact_check_result.consistency_score - 10),
+        confidence_high=min(100, fact_check_result.consistency_score + 10),
+        segments=[],
+        summary=fact_check_result.summary,
+        model_used="Whisper (transcription) + Gemini 2.0 Flash (fact-check)",
+        fact_check=fact_check_result,
         analyzed_at=datetime.utcnow().isoformat() + "Z",
     )
 
