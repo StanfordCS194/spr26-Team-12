@@ -21,8 +21,8 @@
         "form": "Powder · 5 g/serving",
         "price_band": "$$",
         "note": "Single-ingredient creatine monohydrate batch-tested for banned substances.",
-        "url": "https://kleanathlete.com/products/klean-creatine",
-        "image_url": "https://placehold.co/300x300/0a3d2a/ffffff/png?text=Klean%0ACreatine&font=inter"
+        "url": "https://www.kleanathlete.com/klean-creatine.html",
+        "image_url": "https://www.kleanathlete.com/media/catalog/product/cache/daef1c54c66e7829da9c6bbcf101b5de/image/5702ba5e/klean-creatine-ka57692p-315.jpeg"
       },
       {
         "id": "on-creatine",
@@ -32,8 +32,8 @@
         "form": "Powder · 5 g/serving",
         "price_band": "$",
         "note": "Most widely used micronized creatine; Informed Choice batch tested.",
-        "url": "https://www.optimumnutrition.com/en-us/Products/All-Products/MICRONIZED-CREATINE-POWDER/p/CR1",
-        "image_url": "https://placehold.co/300x300/c0a000/000000/png?text=ON%0ACreatine&font=inter"
+        "url": "https://www.optimumnutrition.com/en-us/products/creatine-monohydrate-micronized-powder",
+        "image_url": "https://www.optimumnutrition.com/cdn/shop/files/on-1153060_Image_01.png?v=1769135392&width=600"
       }
     ],
     "whey_protein": [
@@ -56,8 +56,8 @@
         "form": "Powder · 20 g protein/serving",
         "price_band": "$$$",
         "note": "Whey isolate built for athletes subject to drug testing.",
-        "url": "https://kleanathlete.com/products/klean-isolate",
-        "image_url": "https://placehold.co/300x300/0a3d2a/ffffff/png?text=Klean%0AIsolate&font=inter"
+        "url": "https://www.kleanathlete.com/klean-isolate-pouch-us.html",
+        "image_url": "https://www.kleanathlete.com/media/catalog/product/cache/daef1c54c66e7829da9c6bbcf101b5de/image/571510f4/klean-isolate-ka57534p-446.jpeg"
       }
     ],
     "beta_alanine": [
@@ -182,8 +182,8 @@
         "form": "Powder · 5 g BCAA/serving",
         "price_band": "$$",
         "note": "Best used when total daily protein is already adequate.",
-        "url": "https://kleanathlete.com/products/klean-bcaa-peak-atp",
-        "image_url": "https://placehold.co/300x300/0a3d2a/ffffff/png?text=Klean%0ABCAA&font=inter"
+        "url": "https://www.kleanathlete.com/klean-bcaa-peak-atp-reg.html",
+        "image_url": "https://www.kleanathlete.com/media/catalog/product/cache/daef1c54c66e7829da9c6bbcf101b5de/image/57197473/klean-bcaa-peak-atp-reg-ka57678-258.jpeg"
       }
     ],
     "tongkat_ali": [
@@ -195,8 +195,8 @@
         "form": "Capsule · 400 mg 200:1 extract",
         "price_band": "$",
         "note": "Evidence is strongest in low-T or stressed men; effects in healthy men remain modest.",
-        "url": "https://doublewoodsupplements.com/products/tongkat-ali",
-        "image_url": "https://placehold.co/300x300/3a2a0a/ffffff/png?text=DW%0ATongkat&font=inter"
+        "url": "https://doublewoodsupplements.com/products/tongkat-ali-extract",
+        "image_url": "https://doublewoodsupplements.com/cdn/shop/files/TongkatAli_Front_k7i2pk_13972d1a-75b1-471a-93d6-206534313cd8.jpg?crop=center&height=600&v=1767121165&width=600"
       }
     ]
   }

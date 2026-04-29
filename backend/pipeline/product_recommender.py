@@ -14,6 +14,7 @@ from typing import Iterable, List
 
 from .. import config
 from ..models import ExtractedClaimItem, ProductRecommendation
+from . import image_resolver
 
 # Each entry maps a supplement key (matching products.json) to the words /
 # phrases that should trigger its recommendations when seen in the claim.
@@ -60,6 +61,11 @@ def _build_recommendations(keys: Iterable[str], *, limit: int = 3) -> List[Produ
             if not product_id or product_id in seen_ids:
                 continue
             seen_ids.add(product_id)
+            product_url = str(item.get("url", ""))
+            placeholder_image = str(item.get("image_url", ""))
+            resolved_image = image_resolver.resolve_image(
+                product_url, fallback=placeholder_image
+            )
             products.append(
                 ProductRecommendation(
                     id=product_id,
@@ -70,8 +76,8 @@ def _build_recommendations(keys: Iterable[str], *, limit: int = 3) -> List[Produ
                     form=str(item.get("form", "")),
                     price_band=str(item.get("price_band", "")),
                     note=str(item.get("note", "")),
-                    url=str(item.get("url", "")),
-                    image_url=str(item.get("image_url", "")),
+                    url=product_url,
+                    image_url=resolved_image,
                 )
             )
     return products[:limit]

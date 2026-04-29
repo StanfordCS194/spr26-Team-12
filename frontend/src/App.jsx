@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 const THEME_KEY = 'sfc.theme';
 
-const EXAMPLE_TRANSCRIPT = `Creatine makes you go bald, BCAAs are required if you want to build muscle, and tongkat ali can double your testosterone naturally.`;
-
 function detectPlatform(url) {
   const value = (url || '').toLowerCase();
   if (value.includes('reddit.com')) return 'reddit';
@@ -194,7 +192,7 @@ function RecommendationsSection({ item }) {
                 <img
                   src={rec.image_url}
                   alt={`${rec.brand} ${rec.product_name}`}
-                  loading="lazy"
+                  referrerPolicy="no-referrer"
                   onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }}
                 />
               )}
@@ -231,6 +229,20 @@ function ReportView({ report }) {
           {reviewCount > 0 && (
             <p className="muted-note">{reviewCount} claim(s) need more review before Veritas can rate them clearly.</p>
           )}
+          <details className="score-explainer">
+            <summary>How is this score calculated?</summary>
+            <p>
+              Veritas starts every clip at <strong>75/100</strong> and adjusts based on how the
+              evidence lands for each claim. Claims that are clearly <em>supported</em> raise the score,
+              while <em>weak</em>, <em>contradicted</em>, or <em>insufficient</em> claims lower it.
+              High-risk claims that come back weak or contradicted carry an extra penalty,
+              and claims where the evidence review couldn&rsquo;t reach a clear answer take a smaller deduction.
+              The score is capped between 0 and 100.
+            </p>
+            <p className="muted-note" style={{ marginTop: 6 }}>
+              Think of it as &ldquo;how trustworthy was this clip overall&rdquo; &mdash; not a medical rating.
+            </p>
+          </details>
         </div>
         {report.needs_human_review && <span className="review-flag">Needs review</span>}
       </div>
@@ -269,7 +281,7 @@ function ReportView({ report }) {
                 <span className="pill">{sourceLabel(source.provider)} · q{source.quality_score}</span>
               </div>
               <div className="meta">{source.source_type}{source.year ? ` · ${source.year}` : ''}</div>
-              <div className="note">{source.snippet || 'No snippet available.'}</div>
+              <div className="note">{source.summary || source.snippet || 'No snippet available.'}</div>
             </div>
           ))}
 
@@ -478,7 +490,6 @@ export default function App() {
               />
               <div className="row">
                 <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
-                <button className="ghost" onClick={() => setText(EXAMPLE_TRANSCRIPT)}>Use demo transcript</button>
                 <span className="pill">{text.length}/12000</span>
               </div>
             </>

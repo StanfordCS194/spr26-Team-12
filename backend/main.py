@@ -61,9 +61,9 @@ def process_text_endpoint(payload: dict) -> ProcessResponse:
 
 
 @app.post("/api/process/url", response_model=ProcessResponse)
-def process_url_endpoint(payload: dict) -> ProcessResponse:
+async def process_url_endpoint(payload: dict) -> ProcessResponse:
     try:
-        text, platform = preprocessors.process_url(payload.get("url", ""))
+        text, platform = await preprocessors.process_url(payload.get("url", ""))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return ProcessResponse(text=text, source="link", note=f"platform={platform}")

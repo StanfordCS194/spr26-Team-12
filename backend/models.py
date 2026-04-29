@@ -93,6 +93,7 @@ class SourceCandidate(BaseModel):
     title: str
     url: str
     snippet: str = ""
+    summary: str = ""
     source_type: str = "web"
     year: Optional[int] = None
     provider: str = "unknown"
