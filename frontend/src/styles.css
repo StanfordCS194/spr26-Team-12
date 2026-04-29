@@ -857,3 +857,145 @@ select {
   border: 1px dashed var(--border);
   border-radius: 8px;
 }
+
+/* ============================================================
+   Feature 2 — Credibility leaderboard
+   ============================================================ */
+.icon-btn.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.roster-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roster-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.roster-row:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.roster-row:active { transform: scale(0.997); }
+
+.roster-row .rank {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.roster-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.roster-name strong { font-size: 15px; }
+.roster-name .muted-note { font-size: 12px; }
+
+.grade-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+  flex-shrink: 0;
+}
+.grade-badge .grade-letter { font-weight: 800; line-height: 1; }
+.grade-badge .grade-score { font-size: 11px; opacity: 0.92; margin-top: 2px; letter-spacing: 0.02em; }
+
+.grade-sm { padding: 10px 14px; min-width: 76px; }
+.grade-sm .grade-letter { font-size: 22px; }
+
+.grade-lg { padding: 18px 24px; min-width: 110px; }
+.grade-lg .grade-letter { font-size: 38px; }
+.grade-lg .grade-score { font-size: 13px; }
+
+.grade-a { background: var(--tier-5); }
+.grade-b { background: color-mix(in srgb, var(--tier-5) 70%, var(--tier-4) 30%); }
+.grade-c { background: var(--tier-3); color: #2c2200; }
+.grade-d { background: var(--tier-2); }
+.grade-f { background: var(--tier-1); }
+.grade-na { background: var(--text-muted); }
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.bucket-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+}
+
+.bucket {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 6px;
+  text-align: center;
+}
+.bucket-num { font-size: 22px; font-weight: 700; line-height: 1; }
+.bucket-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bucket-true       { border-color: color-mix(in srgb, var(--tier-5) 60%, var(--border)); }
+.bucket-true       .bucket-num { color: var(--tier-5); }
+.bucket-mostly_true { border-color: color-mix(in srgb, var(--tier-4) 50%, var(--border)); }
+.bucket-mostly_true .bucket-num { color: var(--tier-4); }
+.bucket-mixed      .bucket-num { color: var(--tier-3); }
+.bucket-weak       .bucket-num { color: var(--tier-2); }
+.bucket-false      { border-color: color-mix(in srgb, var(--tier-1) 55%, var(--border)); }
+.bucket-false      .bucket-num { color: var(--tier-1); }
+.bucket-unverified .bucket-num { color: var(--text-muted); }
+
+.claim-history-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.claim-history-row:last-child { border-bottom: 0; }
+.claim-history-text {
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+@media (max-width: 600px) {
+  .bucket-grid { grid-template-columns: repeat(3, 1fr); }
+  .roster-row { grid-template-columns: 24px 1fr auto; gap: 10px; padding: 12px; }
+  .profile-head { flex-direction: column; align-items: flex-start; }
+}

@@ -8,6 +8,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, preprocessors
+from .influencers import router as influencers_router
 from .models import (
     ClipReportRequest,
     ClipReportResponse,
@@ -20,7 +21,13 @@ from .models import (
     Verdict,
     VerdictRequest,
 )
-from .pipeline import clip_checker, extractor, transcriber, verdict as verdict_pipeline
+from .pipeline import (
+    clip_checker,
+    credibility_store,
+    extractor,
+    transcriber,
+    verdict as verdict_pipeline,
+)
 
 app = FastAPI(title="Veritas", version="0.2.0")
 
@@ -31,6 +38,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(influencers_router)
 
 
 @app.get("/api/health")
@@ -144,10 +153,14 @@ async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
     selected = [claim for claim in req.claims if claim.selected]
     if not selected:
         raise HTTPException(status_code=400, detail="select at least one claim")
-    return await clip_checker.build_report(
+    report = await clip_checker.build_report(
         req.transcript,
         req.claims,
         source=req.source,
         creator_name=req.creator_name,
         brand_name=req.brand_name,
     )
+    # Feature 2: append every claim to the named creator's running history so
+    # their credibility score reflects this clip the next time it's queried.
+    credibility_store.record_report(report)
+    return report
