@@ -1,0 +1,203 @@
+{
+  "_note": "Curated catalog of third-party verified supplements. The FDA does not approve dietary supplements; the strongest available bar is third-party certification (NSF Certified for Sport, USP Verified, Informed Sport / Informed Choice) produced in FDA-registered cGMP facilities. Veritas surfaces only products that meet that bar.",
+  "supplements": {
+    "creatine": [
+      {
+        "id": "thorne-creatine",
+        "brand": "Thorne",
+        "product_name": "Creatine Monohydrate",
+        "certification": "NSF Certified for Sport",
+        "form": "Powder · 5 g/serving",
+        "price_band": "$$",
+        "note": "Pure micronized creatine monohydrate from a brand widely used by professional sports leagues.",
+        "url": "https://www.thorne.com/products/dp/creatine",
+        "image_url": "https://placehold.co/300x300/0b1220/ffffff/png?text=Thorne%0ACreatine&font=inter"
+      },
+      {
+        "id": "klean-creatine",
+        "brand": "Klean Athlete",
+        "product_name": "Klean Creatine",
+        "certification": "NSF Certified for Sport",
+        "form": "Powder · 5 g/serving",
+        "price_band": "$$",
+        "note": "Single-ingredient creatine monohydrate batch-tested for banned substances.",
+        "url": "https://kleanathlete.com/products/klean-creatine",
+        "image_url": "https://placehold.co/300x300/0a3d2a/ffffff/png?text=Klean%0ACreatine&font=inter"
+      },
+      {
+        "id": "on-creatine",
+        "brand": "Optimum Nutrition",
+        "product_name": "Micronized Creatine Powder",
+        "certification": "Informed Choice",
+        "form": "Powder · 5 g/serving",
+        "price_band": "$",
+        "note": "Most widely used micronized creatine; Informed Choice batch tested.",
+        "url": "https://www.optimumnutrition.com/en-us/Products/All-Products/MICRONIZED-CREATINE-POWDER/p/CR1",
+        "image_url": "https://placehold.co/300x300/c0a000/000000/png?text=ON%0ACreatine&font=inter"
+      }
+    ],
+    "whey_protein": [
+      {
+        "id": "on-gold-whey",
+        "brand": "Optimum Nutrition",
+        "product_name": "Gold Standard 100% Whey",
+        "certification": "Informed Choice",
+        "form": "Powder · 24 g protein/serving",
+        "price_band": "$$",
+        "note": "Whey isolate primary; widely tested and consistent dose.",
+        "url": "https://www.optimumnutrition.com/en-us/Products/Protein/GOLD-STANDARD-100-WHEY/p/gold-standard-100-whey",
+        "image_url": "https://placehold.co/300x300/8a1f1f/ffffff/png?text=ON%0AGold+Whey&font=inter"
+      },
+      {
+        "id": "klean-whey",
+        "brand": "Klean Athlete",
+        "product_name": "Klean Isolate Whey",
+        "certification": "NSF Certified for Sport",
+        "form": "Powder · 20 g protein/serving",
+        "price_band": "$$$",
+        "note": "Whey isolate built for athletes subject to drug testing.",
+        "url": "https://kleanathlete.com/products/klean-isolate",
+        "image_url": "https://placehold.co/300x300/0a3d2a/ffffff/png?text=Klean%0AIsolate&font=inter"
+      }
+    ],
+    "beta_alanine": [
+      {
+        "id": "thorne-beta-alanine",
+        "brand": "Thorne",
+        "product_name": "Beta Alanine-SR",
+        "certification": "NSF Certified for Sport",
+        "form": "Sustained-release tablet · 1.6 g/serving",
+        "price_band": "$$",
+        "note": "Sustained-release form reduces tingling sensation.",
+        "url": "https://www.thorne.com/products/dp/beta-alanine-sr",
+        "image_url": "https://placehold.co/300x300/0b1220/ffffff/png?text=Thorne%0ABeta-Alanine&font=inter"
+      }
+    ],
+    "caffeine": [
+      {
+        "id": "now-caffeine",
+        "brand": "NOW Sports",
+        "product_name": "Caffeine 200 mg",
+        "certification": "Informed Sport",
+        "form": "Capsule · 200 mg",
+        "price_band": "$",
+        "note": "Single-ingredient caffeine for predictable pre-workout dosing.",
+        "url": "https://www.nowfoods.com/products/sports-nutrition/caffeine-200-mg-veg-capsules",
+        "image_url": "https://placehold.co/300x300/2b5d34/ffffff/png?text=NOW%0ACaffeine&font=inter"
+      }
+    ],
+    "fish_oil": [
+      {
+        "id": "nordic-omega",
+        "brand": "Nordic Naturals",
+        "product_name": "Ultimate Omega",
+        "certification": "IFOS 5-star",
+        "form": "Softgel · 1280 mg omega-3",
+        "price_band": "$$$",
+        "note": "Independently tested for purity, potency, and freshness.",
+        "url": "https://www.nordicnaturals.com/healthcare-products/ultimate-omega/",
+        "image_url": "https://placehold.co/300x300/0e2a4a/ffffff/png?text=Nordic%0AOmega&font=inter"
+      },
+      {
+        "id": "thorne-omega",
+        "brand": "Thorne",
+        "product_name": "Omega-3 w/ CoQ10",
+        "certification": "NSF Certified for Sport",
+        "form": "Softgel · 1500 mg EPA/DHA",
+        "price_band": "$$$",
+        "note": "Concentrated EPA/DHA with CoQ10 for athletes.",
+        "url": "https://www.thorne.com/products/dp/omega-3-with-coq10",
+        "image_url": "https://placehold.co/300x300/0b1220/ffffff/png?text=Thorne%0AOmega-3&font=inter"
+      }
+    ],
+    "vitamin_d": [
+      {
+        "id": "thorne-d-k2",
+        "brand": "Thorne",
+        "product_name": "Vitamin D/K2 Liquid",
+        "certification": "NSF Certified for Sport",
+        "form": "Liquid · 1000 IU D3 + K2 per drop",
+        "price_band": "$$",
+        "note": "Pairs vitamin D with K2 for calcium handling.",
+        "url": "https://www.thorne.com/products/dp/vitamin-d-k2-liquid",
+        "image_url": "https://placehold.co/300x300/0b1220/ffffff/png?text=Thorne%0AD%2FK2&font=inter"
+      },
+      {
+        "id": "now-d3",
+        "brand": "NOW",
+        "product_name": "Vitamin D-3 5000 IU",
+        "certification": "USP Verified ingredients",
+        "form": "Softgel · 5000 IU",
+        "price_band": "$",
+        "note": "High-potency vitamin D3 in olive oil.",
+        "url": "https://www.nowfoods.com/products/supplements/vitamin-d-3-5000-iu-softgels",
+        "image_url": "https://placehold.co/300x300/2b5d34/ffffff/png?text=NOW%0AD3&font=inter"
+      }
+    ],
+    "magnesium": [
+      {
+        "id": "thorne-mag-bisglycinate",
+        "brand": "Thorne",
+        "product_name": "Magnesium Bisglycinate",
+        "certification": "TGA-tested manufacturing",
+        "form": "Powder · 200 mg/serving",
+        "price_band": "$$",
+        "note": "Highly bioavailable chelated magnesium.",
+        "url": "https://www.thorne.com/products/dp/magnesium-bisglycinate",
+        "image_url": "https://placehold.co/300x300/0b1220/ffffff/png?text=Thorne%0AMagnesium&font=inter"
+      }
+    ],
+    "ashwagandha": [
+      {
+        "id": "thorne-ashwagandha",
+        "brand": "Thorne",
+        "product_name": "Ashwagandha (KSM-66)",
+        "certification": "NSF GMP-registered facility",
+        "form": "Capsule · 500 mg KSM-66",
+        "price_band": "$$",
+        "note": "Standardized KSM-66 root extract used in most clinical trials.",
+        "url": "https://www.thorne.com/products/dp/ashwagandha",
+        "image_url": "https://placehold.co/300x300/0b1220/ffffff/png?text=Thorne%0AAshwagandha&font=inter"
+      }
+    ],
+    "citrulline": [
+      {
+        "id": "now-citrulline",
+        "brand": "NOW Sports",
+        "product_name": "L-Citrulline 750 mg",
+        "certification": "Informed Sport",
+        "form": "Capsule · 750 mg",
+        "price_band": "$",
+        "note": "Pure L-citrulline for endurance and pump support.",
+        "url": "https://www.nowfoods.com/products/sports-nutrition/l-citrulline-750-mg-veg-capsules",
+        "image_url": "https://placehold.co/300x300/2b5d34/ffffff/png?text=NOW%0ACitrulline&font=inter"
+      }
+    ],
+    "bcaa": [
+      {
+        "id": "klean-bcaa",
+        "brand": "Klean Athlete",
+        "product_name": "Klean BCAA + Peak ATP",
+        "certification": "NSF Certified for Sport",
+        "form": "Powder · 5 g BCAA/serving",
+        "price_band": "$$",
+        "note": "Best used when total daily protein is already adequate.",
+        "url": "https://kleanathlete.com/products/klean-bcaa-peak-atp",
+        "image_url": "https://placehold.co/300x300/0a3d2a/ffffff/png?text=Klean%0ABCAA&font=inter"
+      }
+    ],
+    "tongkat_ali": [
+      {
+        "id": "doublewood-tongkat",
+        "brand": "Double Wood",
+        "product_name": "Tongkat Ali (Eurycoma longifolia)",
+        "certification": "cGMP, third-party tested",
+        "form": "Capsule · 400 mg 200:1 extract",
+        "price_band": "$",
+        "note": "Evidence is strongest in low-T or stressed men; effects in healthy men remain modest.",
+        "url": "https://doublewoodsupplements.com/products/tongkat-ali",
+        "image_url": "https://placehold.co/300x300/3a2a0a/ffffff/png?text=DW%0ATongkat&font=inter"
+      }
+    ]
+  }
+}
