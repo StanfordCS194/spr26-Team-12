@@ -292,8 +292,353 @@ function ReportView({ report }) {
   );
 }
 
+// --- Feature 2: Influencer credibility -----------------------------------
+function ScoreRing({ score }) {
+  const tier =
+    score >= 85 ? 'high' : score >= 70 ? 'mid' : score >= 50 ? 'low' : 'bad';
+  return <div className={`score-ring score-${tier}`}>{score}</div>;
+}
+
+function directionDot(direction) {
+  const map = {
+    supports: '✓',
+    partially_supports: '~',
+    mixed: '·',
+    weak: '·',
+    contradicts: '✗',
+    insufficient: '?',
+  };
+  return map[direction] || '·';
+}
+
+function InfluencersView() {
+  const [list, setList] = useState(null);
+  const [active, setActive] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/influencers')
+      .then((r) => r.json())
+      .then((d) => setList(d.influencers || []))
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  if (error) return <div className="panel"><div className="error">{error}</div></div>;
+  if (!list) return <div className="panel">Loading influencers…</div>;
+
+  if (active) {
+    return <InfluencerDetail slug={active} onBack={() => setActive(null)} />;
+  }
+
+  return (
+    <div className="panel">
+      <div className="review-head">
+        <div>
+          <div className="label">Feature 2</div>
+          <h2>Influencer credibility</h2>
+        </div>
+        <span className="pill">{list.length} tracked</span>
+      </div>
+      <p className="muted">
+        Scores aggregate every Veritas fact-check attributed to that creator.
+        High score ≠ every product they push is good (see Products).
+      </p>
+      <div className="influencer-grid">
+        {list.map((inf) => (
+          <button key={inf.slug} className="influencer-card" onClick={() => setActive(inf.slug)}>
+            <div className="influencer-head">
+              <div
+                className="avatar"
+                style={{ background: inf.avatar_color }}
+                aria-hidden
+              >
+                {inf.name?.charAt(0) || '?'}
+              </div>
+              <ScoreRing score={inf.credibility_score} />
+            </div>
+            <div className="influencer-body">
+              <div className="influencer-name">{inf.name}</div>
+              <div className="influencer-handle">{inf.handle}</div>
+              <div className="influencer-meta">
+                {inf.followers && <span>{inf.followers}</span>}
+                <span>{inf.claims_checked} claims checked</span>
+              </div>
+              <div className="topic-row">
+                {(inf.topics || []).slice(0, 3).map((t) => (
+                  <span key={t} className="topic-pill">{t}</span>
+                ))}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InfluencerDetail({ slug, onBack }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    fetch(`/api/influencers/${slug}`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch((e) => setError(String(e)));
+  }, [slug]);
+  if (error) return <div className="panel"><div className="error">{error}</div></div>;
+  if (!data) return <div className="panel">Loading…</div>;
+  return (
+    <>
+      <div className="panel">
+        <button className="ghost" onClick={onBack}>← All influencers</button>
+        <div className="detail-head">
+          <div className="avatar lg" style={{ background: data.avatar_color }}>
+            {data.name?.charAt(0)}
+          </div>
+          <div className="detail-meta">
+            <h2>{data.name}</h2>
+            <div className="muted">{data.handle} · {(data.platforms || []).join(', ')} · {data.followers}</div>
+            <p>{data.bio}</p>
+            <div className="topic-row">
+              {(data.topics || []).map((t) => <span key={t} className="topic-pill">{t}</span>)}
+            </div>
+          </div>
+          <ScoreRing score={data.credibility_score} />
+        </div>
+        <div className="breakdown-row">
+          {Object.entries(data.direction_breakdown || {}).map(([dir, n]) => (
+            <span key={dir} className={`direction dir-${dir}`}>{directionLabel(dir)}: {n}</span>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="label">Recent claims fact-checked</div>
+        <ul className="claim-history">
+          {data.recent_claims.map((e, i) => (
+            <li key={i}>
+              <span className={`direction dir-${e.direction}`}>{directionDot(e.direction)} {directionLabel(e.direction)}</span>
+              <div className="claim-text">{e.claim}</div>
+              {e.source_clip && <div className="muted">from "{e.source_clip}"</div>}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {data.promoted_products?.length > 0 && (
+        <div className="panel">
+          <div className="label">Products in the same supplement categories</div>
+          <p className="muted">
+            Reminder: a credible influencer can still promote a weak product. Open each one in Products to see its independent score.
+          </p>
+          <div className="product-grid">
+            {data.promoted_products.map((p) => (
+              <a key={p.id} className="product-card" href={p.url} target="_blank" rel="noreferrer">
+                <div
+                  className="product-thumb"
+                  data-initials={(p.brand || '?').slice(0, 2).toUpperCase()}
+                >
+                  {p.image_url && (
+                    <img
+                      src={p.image_url}
+                      alt={p.product_name}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                </div>
+                <div className="product-body">
+                  <div className="product-brand">{p.brand}</div>
+                  <div className="product-name">{p.product_name}</div>
+                  <div className="product-cert muted">{p.supplement}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// --- Feature 3: Product credibility ---------------------------------------
+function ProductsView() {
+  const [list, setList] = useState(null);
+  const [active, setActive] = useState(null);
+  const [error, setError] = useState('');
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((d) => setList(d.products || []))
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  if (error) return <div className="panel"><div className="error">{error}</div></div>;
+  if (!list) return <div className="panel">Loading products…</div>;
+  if (active) return <ProductDetail productId={active} onBack={() => setActive(null)} />;
+
+  const filtered = list.filter((p) => {
+    const q = filter.toLowerCase();
+    return !q || p.brand.toLowerCase().includes(q) || p.product_name.toLowerCase().includes(q) || p.supplement.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="panel">
+      <div className="review-head">
+        <div>
+          <div className="label">Feature 3</div>
+          <h2>Product credibility</h2>
+        </div>
+        <span className="pill">{list.length} products</span>
+      </div>
+      <p className="muted">
+        Each score blends evidence (50%), third-party certification quality (30%),
+        and average credibility of influencers who endorsed it (20%).
+        A weakly-supported supplement can still rank low even if a famous person promotes it.
+      </p>
+      <input
+        className="filter-input"
+        type="text"
+        placeholder="Filter by brand, product, or supplement…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+      />
+      <div className="product-cred-grid">
+        {filtered.map((p) => (
+          <button key={p.id} className="product-cred-card" onClick={() => setActive(p.id)}>
+            <div className="pcred-head">
+              <div
+                className="product-thumb sm"
+                data-initials={(p.brand || '?').slice(0, 2).toUpperCase()}
+              >
+                {p.image_url && (
+                  <img
+                    src={p.image_url}
+                    alt={p.product_name}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
+              </div>
+              <ScoreRing score={p.credibility_score} />
+            </div>
+            <div className="product-body">
+              <div className="product-brand">{p.brand}</div>
+              <div className="product-name">{p.product_name}</div>
+              <div className="product-cert">{p.supplement} · {p.certification || 'no cert'}</div>
+              <div className="dim-row">
+                <span>Evidence {p.evidence_score}</span>
+                <span>Quality {p.quality_score}</span>
+                <span>Endorse {p.endorsement_score}</span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProductDetail({ productId, onBack }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    fetch(`/api/products/${productId}`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch((e) => setError(String(e)));
+  }, [productId]);
+  if (error) return <div className="panel"><div className="error">{error}</div></div>;
+  if (!data) return <div className="panel">Loading…</div>;
+  return (
+    <>
+      <div className="panel">
+        <button className="ghost" onClick={onBack}>← All products</button>
+        <div className="detail-head">
+          <div
+            className="product-thumb md"
+            data-initials={(data.brand || '?').slice(0, 2).toUpperCase()}
+          >
+            {data.image_url && (
+              <img
+                src={data.image_url}
+                alt={data.product_name}
+                referrerPolicy="no-referrer"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            )}
+          </div>
+          <div className="detail-meta">
+            <h2>{data.brand} — {data.product_name}</h2>
+            <div className="muted">{data.supplement} · {data.form} · {data.price_band}</div>
+            <p>{data.note}</p>
+            <div className="topic-row">
+              {data.certification && <span className="topic-pill">{data.certification}</span>}
+              {data.url && <a className="topic-pill link" href={data.url} target="_blank" rel="noreferrer">Open product page ↗</a>}
+            </div>
+          </div>
+          <ScoreRing score={data.credibility_score} />
+        </div>
+
+        <div className="dim-row big">
+          <div><div className="dim-label">Evidence</div><div className="dim-val">{data.evidence_score}</div></div>
+          <div><div className="dim-label">Quality</div><div className="dim-val">{data.quality_score}</div></div>
+          <div><div className="dim-label">Endorsements</div><div className="dim-val">{data.endorsement_score}</div></div>
+        </div>
+        <div className="breakdown-row">
+          {Object.entries(data.evidence_breakdown || {}).map(([dir, n]) => (
+            <span key={dir} className={`direction dir-${dir}`}>{directionLabel(dir)}: {n}</span>
+          ))}
+        </div>
+      </div>
+
+      {data.evidence_claims?.length > 0 && (
+        <div className="panel">
+          <div className="label">What influencers have claimed about {data.supplement}</div>
+          <ul className="claim-history">
+            {data.evidence_claims.map((e, i) => (
+              <li key={i}>
+                <span className={`direction dir-${e.direction}`}>{directionDot(e.direction)} {directionLabel(e.direction)}</span>
+                <div className="claim-text">{e.claim}</div>
+                {e.influencer_slug && <div className="muted">— {e.influencer_slug}{e.source_clip ? ` · "${e.source_clip}"` : ''}</div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data.promoted_by?.length > 0 && (
+        <div className="panel">
+          <div className="label">Promoted by</div>
+          <p className="muted">
+            Cross-check: a high-cred influencer can still recommend a low-evidence supplement (and vice versa).
+          </p>
+          <div className="influencer-grid sm">
+            {data.promoted_by.map((p) => (
+              <div key={p.slug} className="influencer-card">
+                <div className="influencer-head">
+                  <div className="avatar" style={{ background: p.avatar_color }}>{p.name?.charAt(0)}</div>
+                  <ScoreRing score={p.credibility_score} />
+                </div>
+                <div className="influencer-body">
+                  <div className="influencer-name">{p.name}</div>
+                  <div className="influencer-handle">{p.handle}</div>
+                  <div className="muted">{p.calls.length} call(s) on this supplement</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useTheme();
+  const [view, setView] = useState('factcheck'); // 'factcheck' | 'influencers' | 'products'
   const [tab, setTab] = useState('text');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -451,7 +796,26 @@ export default function App() {
         <ThemeToggle theme={theme} setTheme={setTheme} />
       </header>
 
-      {state === 'idle' && (
+      <nav className="topnav">
+        {[
+          { id: 'factcheck', label: 'Fact Check' },
+          { id: 'influencers', label: 'Influencers' },
+          { id: 'products', label: 'Products' },
+        ].map((v) => (
+          <button
+            key={v.id}
+            className={`topnav-btn ${view === v.id ? 'active' : ''}`}
+            onClick={() => setView(v.id)}
+          >
+            {v.label}
+          </button>
+        ))}
+      </nav>
+
+      {view === 'influencers' && <InfluencersView />}
+      {view === 'products' && <ProductsView />}
+
+      {view === 'factcheck' && state === 'idle' && (
         <div className="panel">
           <div className="tabs">
             {['text', 'audio', 'link', 'screenshot'].map((item) => (
@@ -555,7 +919,7 @@ export default function App() {
                   style={{ display: 'none' }}
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                 />
-                {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
+       view === 'factcheck' &&          {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
               </label>
               <div className="row">
                 <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
@@ -578,7 +942,7 @@ export default function App() {
         <>
           <div className="panel">
             <div className="label">Transcript</div>
-            <p className="transcript-box">{transcript}</p>
+       view === 'factcheck' &&      <p className="transcript-box">{transcript}</p>
           </div>
           <div className="panel">
             <div className="review-head">
@@ -587,7 +951,7 @@ export default function App() {
                 <h2>Edit before fact-checking</h2>
               </div>
               <span className="pill">{selectedCount} selected</span>
-            </div>
+       view === 'factcheck' &&      </div>
             <ClaimEditor claims={claims} setClaims={setClaims} />
             <div className="row">
               <button className="primary" disabled={selectedCount === 0} onClick={runReport}>Fact-check selected claims</button>
