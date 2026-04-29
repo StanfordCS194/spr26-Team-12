@@ -1,238 +1,153 @@
-import logging
-import os
+"""FastAPI entrypoint. Run with: uvicorn backend.main:app --reload"""
+from __future__ import annotations
+
+import time
 import uuid
-import asyncio
-from datetime import datetime
 
-# Load backend/.env before any module reads os.environ
-from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
-
-import certifi
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
-from models import (
-    AnalysisResult, SegmentAnalysis,
-    ReportRequest, ReportResponse,
+from . import config, preprocessors
+from .models import (
+    ClipReportRequest,
+    ClipReportResponse,
+    ExtractRequest,
+    ExtractClaimsRequest,
+    ExtractClaimsResponse,
+    ExtractResponse,
+    ProcessResponse,
+    ProviderStatus,
+    Verdict,
+    VerdictRequest,
 )
-from database import init_db, save_analysis, get_analysis, save_report, get_report
-from report_pdf import generate_pdf
-from detector import analyze as run_detection
+from .pipeline import clip_checker, extractor, transcriber, verdict as verdict_pipeline
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-YTDLP = os.path.join(os.path.dirname(__file__), "venv/bin/yt-dlp")
-SSL_ENV = {**os.environ, "SSL_CERT_FILE": certifi.where()}
-
-app = FastAPI()
+app = FastAPI(title="Veritas", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "/tmp/veritas"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-ALLOWED_TYPES = {
-    "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg",
-    "audio/x-m4a", "audio/m4a", "video/mp4",
-}
-MAX_SIZE = 100 * 1024 * 1024  # 100 MB
-
-init_db()
-
-
-# ── Feature 1: Audio Upload & Ingestion ──────────────────────────
-
-
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(400, f"Unsupported file type: {file.content_type}")
-
-    data = await file.read()
-    if len(data) > MAX_SIZE:
-        raise HTTPException(400, "File exceeds 100 MB limit")
-
-    file_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename)[1] or ".mp3"
-    path = os.path.join(UPLOAD_DIR, f"{file_id}{ext}")
-    with open(path, "wb") as f:
-        f.write(data)
-
-    return {"file_id": file_id, "filename": file.filename}
+@app.get("/api/health")
+def health() -> dict:
+    return {
+        "ok": True,
+        "demo_mode": config.DEMO_MODE,
+        "providers": ProviderStatus(
+            primary_llm_provider=config.PRIMARY_LLM_PROVIDER,
+            secondary_llm_provider=config.SECONDARY_LLM_PROVIDER,
+            transcription_provider="groq",
+            search_provider=config.SEARCH_PROVIDER,
+            openai_configured=bool(config.OPENAI_API_KEY),
+            groq_configured=bool(config.GROQ_API_KEY),
+            search_configured=bool(config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY),
+        ).model_dump(),
+    }
 
 
-class URLRequest(BaseModel):
-    url: str
-
-
-@app.post("/ingest-url")
-async def ingest_url(req: URLRequest):
-    if not req.url.startswith("https://"):
-        raise HTTPException(400, "URL must use HTTPS")
-
-    file_id = str(uuid.uuid4())
-    out_path = os.path.join(UPLOAD_DIR, f"{file_id}.mp3")
-
-    proc = await asyncio.create_subprocess_exec(
-        YTDLP, "-x", "--audio-format", "mp3", "-o", out_path, req.url,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-        env=SSL_ENV,
-    )
-    await asyncio.wait_for(proc.communicate(), timeout=120)
-    if proc.returncode != 0:
-        raise HTTPException(400, "Could not extract audio from URL")
-
-    return {"file_id": file_id, "filename": req.url.split("/")[-1]}
-
-
-@app.get("/preview/{file_id}")
-async def preview(file_id: str):
+# --- Pre-processor endpoints (used by the frontend before /extract) ---
+@app.post("/api/process/text", response_model=ProcessResponse)
+def process_text_endpoint(payload: dict) -> ProcessResponse:
     try:
-        uuid.UUID(file_id)
-    except ValueError:
-        raise HTTPException(400, "Invalid file ID")
-
-    for fname in os.listdir(UPLOAD_DIR):
-        if fname.startswith(file_id):
-            return FileResponse(os.path.join(UPLOAD_DIR, fname))
-
-    raise HTTPException(404, "File not found")
+        text = preprocessors.process_text(payload.get("text", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return ProcessResponse(text=text, source="text")
 
 
-# ── Feature 2: AI/Human Detection Engine ─────────────────────────
-
-
-@app.post("/analyze/{file_id}")
-async def analyze(file_id: str):
-    """
-    Run the real ML detection pipeline (Features 2.1–2.3):
-      · Preprocessing — normalise, trim silence, segment into 3 s windows
-      · Ensemble model — Wav2Vec2 deepfake classifier (primary) +
-                         acoustic feature analyser + CNN spectrogram analyser
-      · Output — per-segment scores, overall probability, verdict, CI
-    """
+@app.post("/api/process/url", response_model=ProcessResponse)
+def process_url_endpoint(payload: dict) -> ProcessResponse:
     try:
-        uuid.UUID(file_id)
-    except ValueError:
-        raise HTTPException(400, "Invalid file ID")
+        text, platform = preprocessors.process_url(payload.get("url", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return ProcessResponse(text=text, source="link", note=f"platform={platform}")
 
-    found = None
-    for fname in os.listdir(UPLOAD_DIR):
-        if fname.startswith(file_id):
-            found = fname
-            break
-    if not found:
-        raise HTTPException(404, "File not found")
 
-    audio_path = os.path.join(UPLOAD_DIR, found)
+@app.post("/api/process/screenshot", response_model=ProcessResponse)
+async def process_screenshot_endpoint(image: UploadFile = File(...)) -> ProcessResponse:
+    data = await image.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    text = preprocessors.process_screenshot(data)
+    return ProcessResponse(text=text, source="screenshot")
 
+
+@app.post("/api/process/audio", response_model=ProcessResponse)
+async def process_audio_endpoint(audio: UploadFile = File(...)) -> ProcessResponse:
+    data = await audio.read()
     try:
-        detection = await asyncio.get_event_loop().run_in_executor(
-            None, run_detection, audio_path
+        transcript = await transcriber.transcribe_audio(
+            audio.filename or "audio",
+            audio.content_type or "application/octet-stream",
+            data,
         )
-    except ValueError as exc:
-        raise HTTPException(422, str(exc))
-    except Exception as exc:
-        logger.exception("Detection pipeline failed for %s", found)
-        raise HTTPException(500, f"Analysis failed: {exc}")
+    except transcriber.TranscriptionUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return ProcessResponse(text=transcript, source="audio", note="transcribed")
 
-    analysis_id = str(uuid.uuid4())
-    result = AnalysisResult(
-        analysis_id=analysis_id,
-        file_id=file_id,
-        filename=found,
-        overall_score=detection.overall_score,
-        verdict=detection.verdict,
-        confidence_low=detection.confidence_low,
-        confidence_high=detection.confidence_high,
-        segments=[
-            SegmentAnalysis(
-                start_time=s.start_time,
-                end_time=s.end_time,
-                confidence_score=s.confidence_score,
-                contributors=s.contributors,
-            )
-            for s in detection.segments
-        ],
-        summary=detection.summary,
-        model_used=detection.model_used,
-        analyzed_at=datetime.utcnow().isoformat() + "Z",
+
+# --- Core endpoints ---
+@app.post("/api/extract", response_model=ExtractResponse)
+async def extract(req: ExtractRequest) -> ExtractResponse:
+    if not req.raw_text.strip():
+        raise HTTPException(status_code=400, detail="raw_text required")
+    t0 = time.perf_counter()
+    claim = await extractor.extract_claim(req.raw_text)
+    return ExtractResponse(
+        extracted_claim=claim,
+        request_id=uuid.uuid4().hex,
+        extraction_time_ms=int((time.perf_counter() - t0) * 1000),
     )
 
-    save_analysis(analysis_id, file_id, found, result.model_dump())
+
+@app.post("/api/claims/extract", response_model=ExtractClaimsResponse)
+async def extract_claims(req: ExtractClaimsRequest) -> ExtractClaimsResponse:
+    if not req.transcript.strip():
+        raise HTTPException(status_code=400, detail="transcript required")
+    t0 = time.perf_counter()
+    claims = await clip_checker.extract_claims(req.transcript)
+    return ExtractClaimsResponse(
+        transcript=req.transcript,
+        claims=claims,
+        request_id=uuid.uuid4().hex,
+        extraction_time_ms=int((time.perf_counter() - t0) * 1000),
+    )
+
+
+@app.post("/api/verdict", response_model=Verdict)
+async def verdict(req: VerdictRequest) -> Verdict:
+    if not req.extracted_claim.strip():
+        raise HTTPException(status_code=400, detail="extracted_claim required")
+    t0 = time.perf_counter()
+    result = await verdict_pipeline.generate_verdict(
+        req.extracted_claim,
+        req.request_id,
+        gen_ms=0,
+    )
+    # patch in real elapsed time
+    result.generation_time_ms = int((time.perf_counter() - t0) * 1000)
     return result
 
 
-@app.get("/analysis/{analysis_id}")
-async def get_analysis_result(analysis_id: str):
-    row = get_analysis(analysis_id)
-    if not row:
-        raise HTTPException(404, "Analysis not found")
-    return row["result"]
-
-
-# ── Feature 5: Shareable Report Export ────────────────────────────
-
-
-@app.post("/reports", response_model=ReportResponse)
-async def create_report(req: ReportRequest):
-    row = get_analysis(req.analysis_id)
-    if not row:
-        raise HTTPException(404, "Analysis not found")
-
-    analysis = AnalysisResult(**row["result"])
-    report_id = str(uuid.uuid4())
-    pdf_path = generate_pdf(report_id, analysis)
-
-    save_report(report_id, req.analysis_id, analysis.file_id, analysis.filename, pdf_path)
-    report = get_report(report_id)
-
-    return ReportResponse(
-        report_id=report_id,
-        share_url=f"/shared/{report_id}",
-        pdf_url=f"/reports/{report_id}/pdf",
-        created_at=report["created_at"],
-        expires_at=report["expires_at"],
+@app.post("/api/clip-report", response_model=ClipReportResponse)
+async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
+    if not req.transcript.strip():
+        raise HTTPException(status_code=400, detail="transcript required")
+    selected = [claim for claim in req.claims if claim.selected]
+    if not selected:
+        raise HTTPException(status_code=400, detail="select at least one claim")
+    return await clip_checker.build_report(
+        req.transcript,
+        req.claims,
+        source=req.source,
+        creator_name=req.creator_name,
+        brand_name=req.brand_name,
     )
-
-
-@app.get("/reports/{report_id}/pdf")
-async def download_report_pdf(report_id: str):
-    report = get_report(report_id)
-    if not report:
-        raise HTTPException(404, "Report not found or expired")
-    if not os.path.exists(report["pdf_path"]):
-        raise HTTPException(404, "PDF file missing")
-    return FileResponse(
-        report["pdf_path"],
-        media_type="application/pdf",
-        filename=f"veritas-report-{report_id[:8]}.pdf",
-    )
-
-
-@app.get("/shared/{report_id}")
-async def shared_report(report_id: str):
-    """Returns report metadata + full analysis for the shared view."""
-    report = get_report(report_id)
-    if not report:
-        raise HTTPException(404, "Report not found or link has expired")
-    analysis_row = get_analysis(report["analysis_id"])
-    if not analysis_row:
-        raise HTTPException(404, "Analysis data missing")
-    return {
-        "report": {
-            "report_id": report["report_id"],
-            "created_at": report["created_at"],
-            "expires_at": report["expires_at"],
-        },
-        "analysis": analysis_row["result"],
-    }

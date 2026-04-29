@@ -1,109 +1,185 @@
-# Veritas — AI Voice Authentication Platform
+# Veritas — Your fitness bro fact checker
 
-AI-powered voice authentication platform that detects whether an audio clip of a public figure was generated or altered by AI. Designed for journalists, fact-checkers, campaign staff, and the informed public.
+Veritas is pivoting into a platform for fact-checking fitness influencers,
+brands, and broscience claims. The first MVP path is:
 
-## Features
+> upload audio/video clip → transcribe → extract claims → fact-check claims →
+> show sources and agreement
 
-### Feature 1: Audio Upload & Ingestion (P0) — Implemented
-The main entry point for all users. Accepts audio through multiple input methods with no barriers to use.
+See [PRODUCT_PIVOT_SPEC.md](PRODUCT_PIVOT_SPEC.md) for the full product plan:
+audio transcription, internal source cross-checking, influencer credibility
+scores, and brand credibility scores.
 
-- **1.1 File Upload** — Drag-and-drop or select audio files (MP3, MP4, WAV, OGG, M4A). Max 100 MB. File type validated before upload with visual progress.
-- **1.2 URL Input** — Paste a YouTube, Twitter/X, or direct media HTTPS link. Backend extracts audio via yt-dlp. Shows error if audio cannot be extracted.
-- **1.3 Audio Preview** — Listen to audio before submission. Submit button disabled until the user has played the audio to confirm they have the right clip.
+## Current Status
 
-### Feature 2: AI/Human Detection Engine (P0) — Implemented
+This repo currently contains the earlier supplement-claim checker plus the
+first cleanup for the new pivot.
 
-Core ML system that evaluates audio and returns a probability score for AI generation.
+What works now:
 
-- **2.1 Preprocessing** — RMS-normalise, mono 16 kHz resample, trim silence, segment into 3-second non-overlapping windows. MFCC (13 coefficients + deltas), Spectral Flux, pitch (F0/pyin), ZCR, and RMS energy extracted per segment. (`backend/preprocessor.py`)
-- **2.2 Model** — Three-component ensemble in `backend/detector.py`:
-  - **Primary (60 %)**: `dima806/deepfake-vs-real-audio-detection` — Wav2Vec 2.0 base fine-tuned for deepfake audio classification (auto-downloads via HuggingFace on first run, ~400 MB). Falls back gracefully to acoustic-only if unavailable.
-  - **Acoustic ensemble (25 % / 60 % fallback)**: Six speech-science features with research-calibrated thresholds — pitch stability (F0 CV), spectral-flux regularity, MFCC-delta flatness, RMS energy CV, spectral-centroid stability, ZCR uniformity.
-  - **CNN spectrogram analyser (15 % / 40 % fallback)**: Mel-spectrogram band-energy ratio, frame temporal correlation, harmonic-to-percussive ratio, spectral-contrast stability.
-- **2.3 Output** — Overall AI probability (0–100%), per-segment scores with top-3 explainability contributors, binary verdict ("Likely Authentic" vs "Likely AI-Generated"), 95 % Wald confidence interval, plain-English citable summary.
+- React/Vite UI with text, audio, link, and screenshot input tabs
+- FastAPI backend
+- Demo cache for showcase supplement verdicts
+- Audio upload endpoint wired for cloud transcription
+- Provider-neutral text generation client
+- Four verdict statuses: `ok`, `out_of_scope`, `no_evidence`, `system_error`
 
-### Feature 3: Confidence Heatmap & Explainability (P1) — Not Started
-Translates per-segment scores into a visual timeline so users can see where anomalies were detected.
+What is next:
 
-- **3.1 Visual Heatmap** — Timeline bar colored green (authentic) to red (AI-generated). Hover to see exact probability and top 3 score contributors per segment.
-- **3.2 Plain English Summary** — Auto-generated one-paragraph summary of findings with citable language for news articles.
+- Replace single-claim flow with transcript → multiple claims
+- Add internal source cross-checking
+- Add agreement-gated verdict judging
+- Add influencer and brand profile scoring
 
-### Feature 4: Politician Identity Matching (P1) — Not Started
-Compares uploaded audio against a reference voice model for the claimed speaker.
+## Prerequisites
 
-- **4.1 Reference Voice Index** — ~200 political leaders indexed from C-SPAN / government archives using ECAPA-TDNN speaker verification.
-- **4.2 Speaker Similarity Score** — Cosine similarity against the reference voice, presented alongside the AI detection score. Low similarity + high AI probability = likely synthetic impersonation.
-
-### Feature 5: Shareable Report Export (P1) — Implemented
-Generate and share organized reports for editorial or legal documentation.
-
-- **5.1 PDF Report** — Auto-generated PDF with report ID, audio metadata, verdict, heatmap (placeholder), plain English summary, model info, and segment analysis table. Branding TBD (Figma).
-- **5.2 Shareable Link** — Each report gets a unique URL to a read-only web view. Links expire after 30 days. Can be embedded in articles or shared with editors.
-
-### Feature 6: REST API Access (P2) — Not Started
-API endpoint for Trust & Safety teams to submit audio programmatically for moderation pipelines.
-
-### Feature 7: Batch Upload (P2) — Not Started
-Process multiple clips at once for Trust & Safety analysts.
-
-### Feature 8: Browser Extension (P3) — Not Started
-Right-click any audio on a webpage to check it.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, Vite, React Router |
-| Backend | Python 3.10+, FastAPI, Uvicorn |
-| Detection — Primary | Wav2Vec 2.0 (`dima806/deepfake-vs-real-audio-detection`) |
-| Detection — Secondary | Acoustic features + CNN spectrogram analysis (librosa) |
-| Database | SQLite (analyses + reports) |
-| PDF Generation | fpdf2 |
-| Audio Extraction | yt-dlp, ffmpeg |
-
-## Requirements
-- Python 3.10+
+- Python 3.9+
 - Node 18+
-- ffmpeg (`brew install ffmpeg`)
-- ~2 GB disk for HuggingFace model cache (downloaded on first analysis)
+- API credits/keys for the live MVP:
+  - Audio transcription provider key
+  - Text reasoning provider key
+  - Optional search key: `TAVILY_API_KEY` or `BRAVE_SEARCH_API_KEY`
 
-## Setup
+Ollama is no longer required.
 
-### Backend
+## Environment
+
+Copy the example env file and fill in keys as needed:
+
 ```bash
-cd backend
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
-venv/bin/uvicorn main:app --reload
+cp .env.example .env
 ```
 
-The Wav2Vec2 deepfake detection model (~400 MB) downloads automatically from HuggingFace on the first `/analyze` call. Subsequent runs use the local cache. Analysis without the model (acoustic-only fallback) works immediately.
+`.env` is git-ignored. Do not commit real API keys.
 
-### Frontend
+For quick shell testing, export directly:
+
+```bash
+export GROQ_API_KEY="..."
+export OPENAI_API_KEY="..."
+export DEMO_MODE=false
+```
+
+Important vars:
+
+| Var | Purpose |
+|---|---|
+| `DEMO_MODE` | `true` uses cached showcase responses; `false` uses configured providers |
+| `PRIMARY_LLM_PROVIDER` | Default text model provider, currently `openai` |
+| `SECONDARY_LLM_PROVIDER` | Second verifier provider, currently `groq` |
+| `GROQ_API_KEY` | Required for audio transcription |
+| `OPENAI_API_KEY` | Required for OpenAI extraction/verdict generation |
+| `SEARCH_PROVIDER` | Planned source search provider (`tavily`, `brave`, etc.) |
+| `MAX_AUDIO_MB` | Upload limit for audio/video files |
+
+## Run Locally
+
+Backend:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --reload --port 8000
+```
+
+Frontend:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Open <http://localhost:5173>.
 
-## API Endpoints
+The Vite dev server proxies `/api/*` to `http://localhost:8000`.
 
-| Method | Path | Feature | Description |
-|--------|------|---------|-------------|
-| `POST` | `/upload` | 1 | Upload an audio file |
-| `POST` | `/ingest-url` | 1 | Extract audio from HTTPS URL |
-| `GET` | `/preview/{file_id}` | 1 | Stream uploaded audio for preview |
-| `POST` | `/analyze/{file_id}` | 2 | Run real ML analysis (preprocessing → ensemble → verdict) |
-| `GET` | `/analysis/{analysis_id}` | 2 | Fetch analysis results |
-| `POST` | `/reports` | 5 | Generate PDF report + shareable link |
-| `GET` | `/reports/{report_id}/pdf` | 5 | Download report PDF |
-| `GET` | `/shared/{report_id}` | 5 | Fetch data for shared report view |
+## Audio MVP Flow
 
-## Source Control
-git: Agam Iheanyi-Igwe (agam01)
+1. Add `GROQ_API_KEY` to your environment.
+2. Start backend and frontend.
+3. Open the **Audio** tab.
+4. Upload an audio/video clip.
+5. Veritas transcribes the file and receives a transcript.
+6. The transcript enters the existing extraction/verdict path.
 
-Henok Tewolde
-Kamal Eissa
-Kennaissa Nabi
+For now, the UI still returns a single extracted claim. The next implementation
+step is changing this to transcript → multiple claims → agreement-gated checks.
+
+## Demo Claims
+
+Without API keys, demo mode still works for a few showcase claims:
+
+- `bro creatine causes hair loss`
+- `ashwagandha boosts testosterone 40%`
+- `do BCAAs build muscle if I eat enough protein`
+- `beta-alanine helps high reps?`
+- `does caffeine improve strength`
+- `tongkat ali 200% testosterone boost real?`
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/health` | Health, demo flag, and provider configuration status |
+| `POST` | `/api/process/text` | Normalize raw pasted text |
+| `POST` | `/api/process/audio` | Transcribe audio/video through the configured provider |
+| `POST` | `/api/process/url` | Process a URL into text placeholder |
+| `POST` | `/api/process/screenshot` | Process screenshot placeholder |
+| `POST` | `/api/claims/extract` | Extract multiple editable claims from transcript |
+| `POST` | `/api/clip-report` | Search sources and return one Veritas rating when the evidence is clear enough |
+| `POST` | `/api/extract` | Legacy: extract one claim from text |
+| `POST` | `/api/verdict` | Legacy: produce a verdict for one extracted claim |
+
+## Repo Layout
+
+```text
+backend/
+  main.py                 FastAPI routes
+  config.py               credit-provider config and upload limits
+  models.py               API schemas
+  preprocessors.py        text/url/screenshot preprocessing
+  pipeline/
+    ai_client.py          provider-neutral text generation helper
+    transcriber.py        audio transcription helper
+    source_search.py      Tavily web search or PubMed fallback
+    clip_checker.py       multi-claim extraction, verifiers, agreement judge
+    extractor.py          current single-claim extraction
+    verdict.py            current single-claim verdict path
+    retriever.py          seed-corpus keyword retrieval
+    demo_cache.py         showcase verdict cache
+frontend/
+  src/App.jsx             UI input flow, now including Audio tab
+  src/VerdictCard.jsx     status-aware verdict renderer
+  src/styles.css          light/dark theme system
+PRODUCT_PIVOT_SPEC.md     full pivot spec and roadmap
+.env.example              provider-key setup template
+```
+
+## Cleanup Done From Pivot
+
+- Removed local Ollama dependency and client code
+- Replaced local-model config with cloud provider config
+- Added audio transcription endpoint
+- Added multi-claim extraction and clip-report endpoints
+- Added source search with Tavily support and PubMed fallback
+- Added internal cross-checking + agreement judge pipeline
+- Added frontend audio upload tab
+- Added frontend claim review/edit and clip report UI
+- Added `.env.example`
+- Updated README to match the credit-based MVP direction
+
+## Next Build Decision
+
+Before adding influencer/brand scoring, build Feature 1 properly:
+
+1. Transcript/audio input
+2. Multi-claim extraction
+3. User claim review/edit step
+4. Internal evidence cross-checking
+5. Agreement judge
+6. Single user-facing Veritas rating
+7. Clip-level report
+
+That proves the core product before we attach scores to people and brands.

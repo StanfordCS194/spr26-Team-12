@@ -1,0 +1,112 @@
+{
+  "showcase": [
+    {
+      "match": ["creatine", "hair loss"],
+      "extracted_claim": "Creatine supplementation causes hair loss in healthy adult men.",
+      "verdict": {
+        "tier": 2,
+        "summary": "Evidence that creatine causes hair loss is weak and based largely on a single small DHT study that did not measure hair loss.",
+        "effect_size": "no measurable effect on hair documented",
+        "dose": "3-5 g/day standard maintenance",
+        "population": "studied in young men; no hair-loss outcomes",
+        "confidence": "high",
+        "why": "The 'creatine causes hair loss' claim traces back to one 2009 RCT in rugby players that found a rise in DHT, but the study did not measure hair loss itself. Subsequent reviews and meta-analyses have not replicated the DHT finding, and no trial has shown increased shedding or AGA progression.",
+        "evidence": [
+          {"source_title": "van der Merwe et al. — Creatine and DHT in rugby players", "source_url": "https://pubmed.ncbi.nlm.nih.gov/19741313/", "study_type": "rct", "year": 2009, "sample_size": 20, "population": "college rugby players", "relevance_note": "Origin of the DHT claim; did not measure hair loss."},
+          {"source_title": "Antonio et al. — ISSN position stand: creatine safety and efficacy", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-021-00412-w", "study_type": "position_stand", "year": 2021, "sample_size": null, "population": "general adult", "relevance_note": "Concludes creatine has no documented adverse effect on hair."},
+          {"source_title": "NIH ODS — Dietary Supplements for Exercise and Athletic Performance: Creatine", "source_url": "https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-HealthProfessional/", "study_type": "fact_sheet", "year": 2024, "sample_size": null, "population": "general", "relevance_note": "Government fact sheet listing established side effects; hair loss not among them."}
+        ]
+      }
+    },
+    {
+      "match": ["ashwagandha", "testosterone"],
+      "extracted_claim": "Ashwagandha increases testosterone by 40% in healthy adult men.",
+      "verdict": {
+        "tier": 2,
+        "summary": "Ashwagandha shows small testosterone increases mainly in stressed or infertile men; a 40% boost in healthy lifters is not supported.",
+        "effect_size": "~10-15% in stressed/infertile men; minimal in healthy",
+        "dose": "300-600 mg/day standardized extract for 8 weeks",
+        "population": "studied in stressed or infertile adult men",
+        "confidence": "medium",
+        "why": "Multiple small RCTs show modest testosterone increases in stressed or sub-fertile men taking standardized ashwagandha for 8+ weeks. Effects in healthy, well-trained men are smaller and inconsistent, and no trial supports a 40% increase. The claim overstates a real but limited effect.",
+        "evidence": [
+          {"source_title": "Lopresti et al. — Ashwagandha and hormonal balance in overweight men", "source_url": "https://pubmed.ncbi.nlm.nih.gov/30728797/", "study_type": "rct", "year": 2019, "sample_size": 57, "population": "overweight men 40-70", "relevance_note": "Found ~14% testosterone increase vs placebo."},
+          {"source_title": "Ambiye et al. — Ashwagandha in oligospermic men", "source_url": "https://pubmed.ncbi.nlm.nih.gov/24371462/", "study_type": "rct", "year": 2013, "sample_size": 46, "population": "infertile men", "relevance_note": "Significant testosterone increase but in non-healthy population."},
+          {"source_title": "Wankhede et al. — Ashwagandha and resistance training", "source_url": "https://pubmed.ncbi.nlm.nih.gov/26609282/", "study_type": "rct", "year": 2015, "sample_size": 57, "population": "trained men 18-50", "relevance_note": "Small testosterone effect (~15%) alongside training; not 40%."}
+        ]
+      }
+    },
+    {
+      "match": ["bcaa", "muscle"],
+      "extracted_claim": "BCAAs build muscle in adults eating adequate protein.",
+      "verdict": {
+        "tier": 2,
+        "summary": "BCAAs add little or no muscle growth when total daily protein intake is already adequate.",
+        "effect_size": "no meaningful additional hypertrophy",
+        "dose": "5-10 g/day commonly studied",
+        "population": "trained and untrained adults",
+        "confidence": "high",
+        "why": "Muscle protein synthesis requires all essential amino acids. Studies isolating BCAAs show transient signaling effects but no advantage over whole protein. When daily protein meets ~1.6 g/kg, BCAAs add nothing measurable.",
+        "evidence": [
+          {"source_title": "Wolfe — BCAAs do not stimulate muscle protein synthesis alone", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-017-0184-9", "study_type": "review", "year": 2017, "sample_size": null, "population": "adults", "relevance_note": "Mechanistic review concluding BCAAs alone are insufficient."},
+          {"source_title": "Jackman et al. — BCAA ingestion and post-exercise MPS", "source_url": "https://pubmed.ncbi.nlm.nih.gov/28638350/", "study_type": "rct", "year": 2017, "sample_size": 10, "population": "resistance-trained men", "relevance_note": "BCAAs raise MPS less than whole protein."},
+          {"source_title": "Morton et al. — Protein intake and resistance training meta-analysis", "source_url": "https://pubmed.ncbi.nlm.nih.gov/28698222/", "study_type": "meta_analysis", "year": 2018, "sample_size": 1863, "population": "training adults", "relevance_note": "Total protein, not BCAAs, drives hypertrophy."}
+        ]
+      }
+    },
+    {
+      "match": ["beta-alanine"],
+      "extracted_claim": "Beta-alanine improves high-rep exercise performance.",
+      "verdict": {
+        "tier": 4,
+        "summary": "Beta-alanine moderately improves performance in efforts lasting 1-4 minutes by buffering muscle acidosis.",
+        "effect_size": "~2-3% improvement in 1-4 min efforts",
+        "dose": "3.2-6.4 g/day for 4-12 weeks",
+        "population": "trained and recreationally active adults",
+        "confidence": "high",
+        "why": "Multiple RCTs and an ISSN position stand support beta-alanine for tasks limited by muscle acidosis. Benefit is largest in the 60-240s window; effects on max strength or short sprints are smaller.",
+        "evidence": [
+          {"source_title": "Trexler et al. — ISSN position stand on beta-alanine", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-015-0090-y", "study_type": "position_stand", "year": 2015, "sample_size": null, "population": "athletes", "relevance_note": "Strong evidence for 1-4 min exercise tasks."},
+          {"source_title": "Hobson et al. — Beta-alanine meta-analysis", "source_url": "https://pubmed.ncbi.nlm.nih.gov/22270875/", "study_type": "meta_analysis", "year": 2012, "sample_size": 360, "population": "trained and untrained", "relevance_note": "Pooled ~2.85% improvement in target window."},
+          {"source_title": "Saunders et al. — Beta-alanine effects updated meta", "source_url": "https://pubmed.ncbi.nlm.nih.gov/27797728/", "study_type": "meta_analysis", "year": 2017, "sample_size": 2000, "population": "broad", "relevance_note": "Confirms moderate effect size."}
+        ]
+      }
+    },
+    {
+      "match": ["caffeine", "strength"],
+      "extracted_claim": "Caffeine improves strength performance.",
+      "verdict": {
+        "tier": 5,
+        "summary": "Caffeine reliably improves strength and power output across many populations and dosing protocols.",
+        "effect_size": "~2-7% increase in strength/power",
+        "dose": "3-6 mg/kg, 30-60 min pre-exercise",
+        "population": "trained and untrained adults",
+        "confidence": "high",
+        "why": "An ISSN position stand and several meta-analyses converge on a clear, reproducible ergogenic effect of caffeine for strength, power, and endurance. Effects are robust across genotypes with modest individual variation.",
+        "evidence": [
+          {"source_title": "Guest et al. — ISSN position stand: caffeine and exercise performance", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-020-00383-4", "study_type": "position_stand", "year": 2021, "sample_size": null, "population": "athletes", "relevance_note": "Strong recommendation for strength/power."},
+          {"source_title": "Grgic et al. — Caffeine and muscle strength meta-analysis", "source_url": "https://pubmed.ncbi.nlm.nih.gov/29527137/", "study_type": "meta_analysis", "year": 2018, "sample_size": 300, "population": "adults", "relevance_note": "Significant pooled improvement in 1RM."},
+          {"source_title": "Grgic — Caffeine and Wingate test meta-analysis", "source_url": "https://pubmed.ncbi.nlm.nih.gov/30086660/", "study_type": "meta_analysis", "year": 2018, "sample_size": null, "population": "adults", "relevance_note": "Confirms power benefit."}
+        ]
+      }
+    },
+    {
+      "match": ["tongkat"],
+      "extracted_claim": "Tongkat ali boosts testosterone 200% in healthy men.",
+      "verdict": {
+        "tier": 2,
+        "summary": "Tongkat ali shows modest testosterone restoration in hypogonadal or stressed men; a 200% increase in healthy men is not supported.",
+        "effect_size": "small effect, mostly in low-T or stressed populations",
+        "dose": "200-400 mg/day standardized extract",
+        "population": "studied mainly in older or hypogonadal men",
+        "confidence": "medium",
+        "why": "Available RCTs report partial testosterone normalization in men with low baseline levels but no dramatic increases in healthy lifters. Studies are small and often industry-funded.",
+        "evidence": [
+          {"source_title": "Tambi et al. — Tongkat ali in late-onset hypogonadism", "source_url": "https://pubmed.ncbi.nlm.nih.gov/21671978/", "study_type": "rct", "year": 2012, "sample_size": 76, "population": "hypogonadal men", "relevance_note": "Restoration toward normal range, not a 200% boost."},
+          {"source_title": "Talbott et al. — Tongkat ali and stress hormones", "source_url": "https://pubmed.ncbi.nlm.nih.gov/23754792/", "study_type": "rct", "year": 2013, "sample_size": 63, "population": "stressed adults", "relevance_note": "Modest hormonal shifts in stressed cohort."},
+          {"source_title": "Examine-style review of tongkat ali (NIH ODS adjacent)", "source_url": "https://ods.od.nih.gov/", "study_type": "review", "year": 2023, "sample_size": null, "population": "general", "relevance_note": "Notes lack of large trials in healthy men."}
+        ]
+      }
+    }
+  ]
+}
