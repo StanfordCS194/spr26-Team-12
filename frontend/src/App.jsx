@@ -36,6 +36,19 @@ function ThemeToggle({ theme, setTheme }) {
   );
 }
 
+function RosterToggle({ onClick, active }) {
+  return (
+    <button
+      className={`icon-btn ${active ? 'is-active' : ''}`}
+      onClick={onClick}
+      title={active ? 'Back to fact-checker' : 'View credibility leaderboard'}
+      aria-label={active ? 'Back to fact-checker' : 'View credibility leaderboard'}
+    >
+      {active ? '←' : 'R'}
+    </button>
+  );
+}
+
 function ProgressList({ stage }) {
   const steps = [
     { id: 'transcribe', label: 'Preparing transcript' },
@@ -61,6 +74,155 @@ function ProgressList({ stage }) {
         );
       })}
     </ul>
+  );
+}
+
+/* ============================================================
+   Feature 2 — Credibility leaderboard
+   ============================================================ */
+const VERDICT_BUCKETS = [
+  { key: 'true', label: 'True', cls: 'true' },
+  { key: 'mostly_true', label: 'Mostly true', cls: 'mostly_true' },
+  { key: 'mixed', label: 'Mixed', cls: 'mixed' },
+  { key: 'weak', label: 'Weak', cls: 'weak' },
+  { key: 'false', label: 'False', cls: 'false' },
+  { key: 'unverified', label: 'Unverified', cls: 'unverified' },
+];
+
+function GradeBadge({ grade, score, size = 'sm' }) {
+  const display = score == null ? '—' : `${score}%`;
+  return (
+    <div className={`grade-badge grade-${grade.toLowerCase().replace('/', '')} grade-${size}`}>
+      <div className="grade-letter">{grade}</div>
+      <div className="grade-score">{display}</div>
+    </div>
+  );
+}
+
+function RosterListView({ items, loading, onSelect, onSeed, error, minVerified, setMinVerified }) {
+  return (
+    <div className="panel">
+      <div className="review-head">
+        <div>
+          <div className="label">Credibility leaderboard</div>
+          <h2>Influencers ranked by claim accuracy</h2>
+        </div>
+        <span className="pill">{items.length} tracked</span>
+      </div>
+
+      <div className="row" style={{ marginTop: 4 }}>
+        <label className="muted-note" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          Min verified claims:
+          <input
+            type="number"
+            min="0"
+            value={minVerified}
+            onChange={(e) => setMinVerified(Math.max(0, Number(e.target.value) || 0))}
+            style={{ width: 64, padding: '4px 8px' }}
+          />
+        </label>
+        <span className="pill">supports +1 · partial +0.5 · mixed 0 · weak −0.5 · contradicts −1</span>
+      </div>
+
+      {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+      {loading && !items.length && <p className="muted-note" style={{ marginTop: 16 }}>Loading…</p>}
+
+      {!loading && !items.length && (
+        <div style={{ marginTop: 18 }}>
+          <p className="muted-note">
+            No influencers tracked yet. Run a clip-report with a creator name and Veritas
+            will start building their credibility profile.
+          </p>
+          <div className="row">
+            <button className="primary" onClick={onSeed}>Load demo influencers</button>
+          </div>
+        </div>
+      )}
+
+      <ul className="roster-list">
+        {items.map((profile, idx) => {
+          const c = profile.credibility;
+          return (
+            <li key={profile.slug}>
+              <button className="roster-row" onClick={() => onSelect(profile.slug)}>
+                <span className="rank">#{idx + 1}</span>
+                <div className="roster-name">
+                  <strong>{profile.name}</strong>
+                  <span className="muted-note">
+                    {c.verified_claims} verified · {c.total_claims} total
+                    {c.needs_review_claims > 0 && ` · ${c.needs_review_claims} need review`}
+                  </span>
+                </div>
+                <GradeBadge grade={c.grade} score={c.score} />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function RosterDetailView({ detail, onBack, onDelete }) {
+  const c = detail.credibility;
+  const buckets = c.buckets || {};
+  return (
+    <>
+      <div className="panel">
+        <button className="ghost" onClick={onBack} style={{ marginBottom: 14 }}>← Back to leaderboard</button>
+        <div className="profile-head">
+          <div>
+            <div className="label">Influencer profile</div>
+            <h2 style={{ margin: '2px 0 6px' }}>{detail.name}</h2>
+            <p className="muted-note" style={{ margin: 0 }}>
+              First tracked {detail.first_seen ? new Date(detail.first_seen).toLocaleDateString() : '—'}
+              {c.last_checked_at && ` · last clip ${new Date(c.last_checked_at).toLocaleDateString()}`}
+            </p>
+          </div>
+          <GradeBadge grade={c.grade} score={c.score} size="lg" />
+        </div>
+
+        <div className="bucket-grid">
+          {VERDICT_BUCKETS.map((b) => (
+            <div key={b.key} className={`bucket bucket-${b.cls}`}>
+              <div className="bucket-num">{buckets[b.key] || 0}</div>
+              <div className="bucket-label">{b.label}</div>
+            </div>
+          ))}
+        </div>
+        <p className="muted-note" style={{ textAlign: 'center', marginTop: 4 }}>
+          Score = (Σ weights + verified) / (2 × verified) × 100, with insufficient claims excluded.
+        </p>
+      </div>
+
+      <div className="panel">
+        <div className="evidence-h" style={{ marginTop: 0 }}>Claim history ({detail.claim_records.length})</div>
+        {detail.claim_records.length === 0 && (
+          <p className="muted-note">No claims have been logged for this influencer yet.</p>
+        )}
+        {detail.claim_records.map((rec) => (
+          <div className="claim-history-row" key={`${rec.report_id}-${rec.claim_id}-${rec.checked_at}`}>
+            <span className={`direction dir-${rec.final_direction}`}>
+              {directionLabel(rec.final_direction)}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="claim-history-text">{rec.claim_text}</div>
+              <div className="muted-note">
+                {rec.category.replaceAll('_', ' ')} · {rec.risk_level} risk · confidence {rec.confidence}
+                {rec.source_domain && ` · ${rec.source_domain}`}
+                {rec.checked_at && ` · ${new Date(rec.checked_at).toLocaleDateString()}`}
+                {rec.needs_review && ' · needs review'}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <button className="ghost" onClick={onBack}>← Back to leaderboard</button>
+        <button className="ghost" onClick={onDelete}>Remove influencer</button>
+      </div>
+    </>
   );
 }
 
@@ -654,7 +816,69 @@ export default function App() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
 
+  // Feature 2: roster (credibility leaderboard) view state
+  const [view, setView] = useState('checker'); // 'checker' | 'roster' | 'roster-detail'
+  const [roster, setRoster] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterError, setRosterError] = useState('');
+  const [rosterMin, setRosterMin] = useState(0);
+  const [activeProfile, setActiveProfile] = useState(null);
+
   const abortRef = useRef(null);
+
+  async function loadRoster() {
+    setRosterLoading(true);
+    setRosterError('');
+    try {
+      const response = await fetch(`/api/influencers?min_verified=${rosterMin}`);
+      if (!response.ok) throw new Error((await response.json()).detail || 'Failed to load leaderboard');
+      setRoster(await response.json());
+    } catch (err) {
+      setRosterError(err.message || String(err));
+    } finally {
+      setRosterLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (view === 'roster') loadRoster();
+  }, [view, rosterMin]);
+
+  async function openProfile(slug) {
+    setRosterError('');
+    try {
+      const response = await fetch(`/api/influencers/${slug}`);
+      if (!response.ok) throw new Error((await response.json()).detail || 'Failed to load profile');
+      setActiveProfile(await response.json());
+      setView('roster-detail');
+    } catch (err) {
+      setRosterError(err.message || String(err));
+    }
+  }
+
+  async function seedRoster() {
+    try {
+      await fetch('/api/influencers/seed', { method: 'POST' });
+      loadRoster();
+    } catch (err) {
+      setRosterError(err.message || String(err));
+    }
+  }
+
+  async function deleteActiveProfile() {
+    if (!activeProfile) return;
+    if (!confirm(`Remove ${activeProfile.name} from the leaderboard?`)) return;
+    try {
+      const response = await fetch(`/api/influencers/${activeProfile.slug}`, { method: 'DELETE' });
+      if (!response.ok && response.status !== 204) {
+        throw new Error((await response.json()).detail || 'Delete failed');
+      }
+      setActiveProfile(null);
+      setView('roster');
+    } catch (err) {
+      setRosterError(err.message || String(err));
+    }
+  }
 
   useEffect(() => {
     function onPaste(e) {
@@ -793,7 +1017,13 @@ export default function App() {
             <span className="sub">Your fitness bro fact checker</span>
           </div>
         </div>
-        <ThemeToggle theme={theme} setTheme={setTheme} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <RosterToggle
+            active={view !== 'checker'}
+            onClick={() => setView(view === 'checker' ? 'roster' : 'checker')}
+          />
+          <ThemeToggle theme={theme} setTheme={setTheme} />
+        </div>
       </header>
 
       <nav className="topnav">
@@ -929,7 +1159,7 @@ export default function App() {
         </div>
       )}
 
-      {(state === 'processing' || state === 'checking') && (
+      {view === 'checker' && (state === 'processing' || state === 'checking') && (
         <div className="panel">
           <ProgressList stage={state} />
           <div className="row">
@@ -938,7 +1168,7 @@ export default function App() {
         </div>
       )}
 
-      {state === 'review' && (
+      {view === 'checker' && state === 'review' && (
         <>
           <div className="panel">
             <div className="label">Transcript</div>
@@ -961,16 +1191,21 @@ export default function App() {
         </>
       )}
 
-      {state === 'report' && report && (
+      {view === 'checker' && state === 'report' && report && (
         <>
           <ReportView report={report} />
-          <div className="row" style={{ justifyContent: 'center' }}>
+          <div className="row" style={{ justifyContent: 'center', gap: 12 }}>
             <button className="ghost" onClick={reset}>Check another clip</button>
+            {report.creator_name && (
+              <button className="ghost" onClick={() => openProfile(report.creator_name.toLowerCase().replace(/^@+/, '').replace(/[^\w\s-]/g, '').replace(/[\s_]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown')}>
+                View {report.creator_name}'s credibility →
+              </button>
+            )}
           </div>
         </>
       )}
 
-      {state === 'error' && (
+      {view === 'checker' && state === 'error' && (
         <div className="panel">
           <div className="error">Something went wrong: {error}</div>
           <div className="row">

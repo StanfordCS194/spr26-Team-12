@@ -8,6 +8,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, preprocessors
+from .influencers import router as influencers_router
 from .models import (
     ClipReportRequest,
     ClipReportResponse,
@@ -32,6 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(influencers_router)
 
 
 @app.get("/api/health")

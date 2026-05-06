@@ -19,5 +19,8 @@ backend/pretrained_models/
 backend/data/ref_cache/
 backend/.pytest_cache/
 
+# Feature 2 — runtime credibility history (seeded per-install via /api/influencers/seed)
+backend/data/influencer_history.json
+
 # System
 .DS_Store
