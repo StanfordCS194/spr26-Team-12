@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background rounded square -->
+  <rect width="128" height="128" rx="28" fill="#7c3aed"/>
+  <!-- V lettermark -->
+  <text
+    x="64" y="92"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="80"
+    font-weight="800"
+    fill="white"
+    text-anchor="middle"
+  >V</text>
+</svg>
