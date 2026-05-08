@@ -6,13 +6,18 @@
   "permissions": [
     "storage",
     "contextMenus",
-    "activeTab"
+    "activeTab",
+    "tabCapture",
+    "sidePanel"
   ],
   "host_permissions": [
     "http://localhost/*"
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   },
   "action": {
     "default_popup": "popup.html",

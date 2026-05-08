@@ -109,6 +109,11 @@ function renderIdle() {
       <button class="btn-primary" id="extractBtn" disabled>Extract claims</button>
       <button class="btn-ghost"   id="demoBtn">Try demo</button>
     </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn-ghost" id="liveBtn" style="width:100%;justify-content:center;">
+        ⏺ Live fact-check (side panel)
+      </button>
+    </div>
   `;
 
   const textarea    = document.getElementById('inputText');
@@ -138,6 +143,20 @@ function renderIdle() {
     textarea.value = DEMO_TRANSCRIPT;
     charCount.textContent = `${DEMO_TRANSCRIPT.length} / 12000`;
     updateExtractBtn();
+  });
+
+  document.getElementById('liveBtn').addEventListener('click', () => {
+    // Open the side panel for the tab that triggered this popup, then close the popup.
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0] && tabs[0].id;
+      if (tabId) {
+        chrome.sidePanel.open({ tabId }).catch(() => {
+          // sidePanel.open may not be available on all pages (e.g. chrome:// URLs).
+          chrome.runtime.openOptionsPage(); // fallback: open settings
+        });
+      }
+      window.close();
+    });
   });
 
   // Pick up text forwarded by the context menu (right-click → "Fact-check with Veritas").

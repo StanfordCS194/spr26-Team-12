@@ -33,6 +33,9 @@ Highlight any fitness claim on YouTube, Reddit, TikTok, Instagram, etc. → righ
 **Option B — click the toolbar icon**
 Click the V icon → paste a transcript, caption, or any fitness claim into the text box → hit **Extract claims**.
 
+**Option C — Live Fact-Check (side panel)**
+Watch a video normally → click the V icon → click **"⏺ Live fact-check"** → the side panel opens alongside the video. Choose a recording window (30/60/90 s), hit **Start recording**, and Veritas captures the tab's audio while you watch. When the timer ends (or you click Stop), it transcribes, extracts claims, and runs the full fact-check pipeline — all without closing the video.
+
 ---
 
 ## How the popup works
@@ -75,9 +78,11 @@ Use the **Test connection** button to verify the backend is reachable before fac
 | Permission | Why it's needed |
 |---|---|
 | `storage` | Saves your backend/frontend URL settings and relays selected text from the context menu to the popup |
-| `contextMenus` | Adds the right-click "Fact-check with Veritas" menu item |
+| `contextMenus` | Adds the right-click "Fact-check with Veritas" and "Live fact-check this tab" menu items |
 | `activeTab` | Lets the background service worker open the popup when you right-click |
-| `http://localhost/*` | Allows the popup to call the local Veritas backend API |
+| `tabCapture` | Captures the tab's audio stream for the Live Fact-Check side panel |
+| `sidePanel` | Enables the Live Fact-Check side panel that stays open while you watch a video |
+| `http://localhost/*` | Allows the popup and side panel to call the local Veritas backend API |
 
 The extension does **not** read page content automatically or send any data anywhere other than the backend URL you configure.
 
@@ -93,6 +98,9 @@ chrome-extension/
 ├── popup.html             Main popup shell
 ├── popup.css              Popup styles (matches Veritas dark theme)
 ├── popup.js               Popup state machine and API calls
+├── sidepanel.html         Live Fact-Check side panel shell
+├── sidepanel.css          Side panel styles (recording ring, pulse dot, verdict cards)
+├── sidepanel.js           Live recording state machine (tabCapture → transcribe → fact-check)
 ├── options.html           Settings page
 ├── options.js             Settings save/load/test logic
 ├── generate-icons.mjs     Script to regenerate PNG icons from the SVG source
@@ -154,6 +162,12 @@ This is expected — two LLM agents run sequentially per claim, each doing a web
 
 **Right-click menu does not open the popup**
 `chrome.action.openPopup()` requires Chrome 127+. On older versions, a `!` badge appears on the extension icon instead — click the icon manually to open the popup. The selected text is already waiting there.
+
+**"Could not capture tab audio" in the side panel**
+The tab must be playing audio (start the video first), and the page must be a normal `http://` or `https://` page — `chrome://` and `edge://` pages block tab capture. Also check that you granted the `tabCapture` permission when prompted.
+
+**Side panel opens but recording produces no speech**
+Make sure the tab's volume is not muted and that the video is actively playing during the recording window. The tab audio capture picks up all audio playing in that tab (video, ads, background music) — not your microphone.
 
 **Changes to extension files are not reflected**
 After editing any file, go to **chrome://extensions** and click the **↺ reload** button on the Veritas card.
