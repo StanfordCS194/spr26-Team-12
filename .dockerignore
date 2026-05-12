@@ -1,0 +1,16 @@
+backend/venv
+backend/__pycache__
+backend/**/__pycache__
+backend/.pytest_cache
+backend/pretrained_models
+backend/data/ref_cache
+backend/data/influencer_history.json
+backend/data/product_image_cache.json
+frontend
+chrome-extension
+test-assets
+.git
+.gitignore
+node_modules
+*.pyc
+.DS_Store

@@ -816,8 +816,9 @@ export default function App() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
 
-  // Feature 2: roster (credibility leaderboard) view state
-  const [view, setView] = useState('checker'); // 'checker' | 'roster' | 'roster-detail'
+  // Feature 2: state for the (now-unused) original roster leaderboard.
+  // The top-nav added by Features 2+3 uses 'view' declared above with values
+  // 'factcheck' | 'influencers' | 'products' instead.
   const [roster, setRoster] = useState([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState('');
@@ -1017,13 +1018,7 @@ export default function App() {
             <span className="sub">Your fitness bro fact checker</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <RosterToggle
-            active={view !== 'checker'}
-            onClick={() => setView(view === 'checker' ? 'roster' : 'checker')}
-          />
-          <ThemeToggle theme={theme} setTheme={setTheme} />
-        </div>
+        <ThemeToggle theme={theme} setTheme={setTheme} />
       </header>
 
       <nav className="topnav">
@@ -1149,7 +1144,7 @@ export default function App() {
                   style={{ display: 'none' }}
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                 />
-       view === 'factcheck' &&          {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
+                {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
               </label>
               <div className="row">
                 <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
@@ -1159,7 +1154,7 @@ export default function App() {
         </div>
       )}
 
-      {view === 'checker' && (state === 'processing' || state === 'checking') && (
+      {view === 'factcheck' && (state === 'processing' || state === 'checking') && (
         <div className="panel">
           <ProgressList stage={state} />
           <div className="row">
@@ -1168,11 +1163,11 @@ export default function App() {
         </div>
       )}
 
-      {view === 'checker' && state === 'review' && (
+      {view === 'factcheck' && state === 'review' && (
         <>
           <div className="panel">
             <div className="label">Transcript</div>
-       view === 'factcheck' &&      <p className="transcript-box">{transcript}</p>
+            <p className="transcript-box">{transcript}</p>
           </div>
           <div className="panel">
             <div className="review-head">
@@ -1181,7 +1176,7 @@ export default function App() {
                 <h2>Edit before fact-checking</h2>
               </div>
               <span className="pill">{selectedCount} selected</span>
-       view === 'factcheck' &&      </div>
+            </div>
             <ClaimEditor claims={claims} setClaims={setClaims} />
             <div className="row">
               <button className="primary" disabled={selectedCount === 0} onClick={runReport}>Fact-check selected claims</button>
@@ -1191,7 +1186,7 @@ export default function App() {
         </>
       )}
 
-      {view === 'checker' && state === 'report' && report && (
+      {view === 'factcheck' && state === 'report' && report && (
         <>
           <ReportView report={report} />
           <div className="row" style={{ justifyContent: 'center', gap: 12 }}>
@@ -1205,7 +1200,7 @@ export default function App() {
         </>
       )}
 
-      {view === 'checker' && state === 'error' && (
+      {view === 'factcheck' && state === 'error' && (
         <div className="panel">
           <div className="error">Something went wrong: {error}</div>
           <div className="row">
