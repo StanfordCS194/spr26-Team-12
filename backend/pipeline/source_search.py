@@ -2,12 +2,16 @@
 
 Tavily is used when configured for broad web search. PubMed is the no-key
 fallback so the MVP still performs real source lookup for fitness science.
+
+Quality scoring is purely string-based: we never fetch the URL during scoring,
+which keeps the pipeline safe from SSRF and fast.
 """
 from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 from urllib.parse import quote_plus
 
 import httpx
@@ -26,6 +30,7 @@ TRUSTED_DOMAINS = (
     "bmj.com",
     "cochranelibrary.com",
     "sportsmedicine-open.springeropen.com",
+    "examine.com",
 )
 SOURCE_ALIASES = {
     "creatine": ("creatine",),
@@ -34,19 +39,61 @@ SOURCE_ALIASES = {
     "beta-alanine": ("beta-alanine", "beta alanine"),
     "caffeine": ("caffeine",),
     "tongkat-ali": ("tongkat", "eurycoma", "longifolia"),
+    "protein": ("protein", "whey", "casein", "amino acid"),
+    "fasted_cardio": ("fasted cardio", "fasted training", "morning cardio"),
+    "intermittent_fasting": ("intermittent fasting", "16:8", "time-restricted"),
+    "sleep": ("sleep", "insomnia", "rest"),
+    "doms": ("doms", "soreness", "muscle soreness"),
+    "lactate": ("lactic acid", "lactate"),
+    "hiit": ("hiit", "interval training", "sprint interval"),
+    "training_frequency": ("training frequency", "workout frequency", "sessions per week"),
+    "training_volume": ("training volume", "weekly sets", "hard sets"),
+    "spot_reduction": ("spot reduction", "target fat", "belly fat"),
+    "stretching": ("stretching", "static stretch", "dynamic warm-up"),
+    "cardio_kills_gains": ("interference", "concurrent training", "cardio kills"),
+    "squat": ("squat depth", "deep squat", "atg", "knees over toes"),
+    "injury_prevention": ("injury prevention", "injury risk"),
+    "preworkout": ("pre-workout", "preworkout"),
+    "natural_limits": ("ffmi", "natural limit", "natty"),
+    "alcohol": ("alcohol", "drinking", "beer"),
 }
 
+# Tiered study-type quality. Higher = stronger evidence type.
+STUDY_TYPE_TIER = {
+    "meta_analysis": 1.00,
+    "systematic_review": 0.95,
+    "position_stand": 0.90,
+    "rct": 0.85,
+    "review": 0.70,
+    "observational": 0.55,
+    "pubmed": 0.65,
+    "web": 0.40,
+    "blog": 0.20,
+}
+_CURRENT_YEAR = datetime.utcnow().year
+_DEFAULT_TIER = 0.50
 
-def _quality_score(url: str, source_type: str) -> float:
-    score = 0.45
-    lowered = url.lower()
+
+def _quality_score(url: str, source_type: str, year: Optional[int] = None) -> float:
+    """Pure URL/metadata-based quality estimate in [0, 1].
+
+    No network calls are made — `url` is treated as opaque display data and
+    only its lowercased substrings are inspected. This keeps the scoring step
+    safe from SSRF and side-effect free.
+    """
+    lowered = (url or "").lower()
+    base = STUDY_TYPE_TIER.get((source_type or "").lower(), _DEFAULT_TIER)
+
     if any(domain in lowered for domain in TRUSTED_DOMAINS):
-        score += 0.35
-    if source_type in {"pubmed", "review", "meta_analysis"}:
-        score += 0.15
-    if any(term in lowered for term in ("shop", "affiliate", "coupon", "blog")):
-        score -= 0.2
-    return max(0.0, min(1.0, round(score, 2)))
+        base += 0.15
+    if any(term in lowered for term in ("shop", "affiliate", "coupon", "/blog", ".blog")):
+        base -= 0.25
+
+    if isinstance(year, int) and 1900 < year <= _CURRENT_YEAR + 1:
+        decades = max(0, (_CURRENT_YEAR - year) // 10)
+        base -= 0.02 * decades  # gentle decay; meta-analyses still beat fresh blogs
+
+    return max(0.0, min(1.0, round(base, 2)))
 
 
 def _dedupe(sources: List[SourceCandidate]) -> List[SourceCandidate]:
@@ -87,15 +134,17 @@ def _search_curated_corpus(claim: str, *, limit: int) -> List[SourceCandidate]:
             continue
         source_type = str(doc.get("study_type") or "review")
         year = doc.get("year")
+        parsed_year = int(year) if isinstance(year, int) else None
         results.append(
             SourceCandidate(
                 title=str(doc.get("source_title") or "Curated source"),
                 url=url,
                 snippet=str(doc.get("full_text") or doc.get("notes") or "")[:900],
                 source_type=source_type,
-                year=int(year) if isinstance(year, int) else None,
+                year=parsed_year,
                 provider="curated_corpus",
-                quality_score=max(_quality_score(url, source_type), 0.92),
+                quality_score=max(_quality_score(url, source_type, parsed_year), 0.92),
+                effect_direction=(str(doc.get("effect_direction")) if doc.get("effect_direction") else None),
             )
         )
     return results
@@ -132,7 +181,7 @@ async def _search_tavily(claim: str, *, limit: int) -> List[SourceCandidate]:
                 snippet=snippet,
                 source_type="web",
                 provider="tavily",
-                quality_score=_quality_score(url, "web"),
+                quality_score=_quality_score(url, "web", None),
             )
         )
     return results
@@ -215,7 +264,7 @@ def _parse_pubmed_xml(xml_text: str) -> List[SourceCandidate]:
                 source_type="pubmed",
                 year=year,
                 provider="pubmed",
-                quality_score=_quality_score(url, "pubmed"),
+                quality_score=_quality_score(url, "pubmed", year),
             )
         )
     return results

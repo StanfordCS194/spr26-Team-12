@@ -5,7 +5,7 @@ import json
 import re
 import time
 import uuid
-from typing import List
+from typing import List, Optional
 
 from .. import config
 from ..models import (
@@ -17,7 +17,28 @@ from ..models import (
     ExtractedClaimItem,
     SourceCandidate,
 )
-from . import ai_client, product_recommender, source_search
+from . import ai_client, demo_cache, product_recommender, source_search
+
+# How a 1-5 evidence tier from the demo cache maps to the public
+# EvidenceDirection labels the UI renders.
+_TIER_TO_DIRECTION: dict[int, EvidenceDirection] = {
+    5: "supports",
+    4: "supports",
+    3: "mixed",
+    2: "weak",
+    1: "contradicts",
+}
+
+# Curated cache study-type strings -> rough quality_score for display dots.
+_CACHE_STUDY_QUALITY = {
+    "meta_analysis":  1.00,
+    "systematic_review": 0.95,
+    "position_stand": 0.92,
+    "rct":            0.88,
+    "review":         0.75,
+    "fact_sheet":     0.78,
+    "observational":  0.60,
+}
 
 ALLOWED_DIRECTIONS = {
     "supports",
@@ -176,7 +197,12 @@ def _sources_block(sources: List[SourceCandidate]) -> str:
     if not sources:
         return "No sources found."
     return "\n\n".join(
-        f"[{idx}] {source.title}\nURL: {source.url}\nType: {source.source_type}\nYear: {source.year or 'unknown'}\nSnippet: {source.snippet[:900]}"
+        f"[{idx}] {source.title}\n"
+        f"URL: {source.url}\n"
+        f"Type: {source.source_type}\n"
+        f"Year: {source.year or 'unknown'}\n"
+        f"Quality: {source.quality_score:.2f} (0=blog, 1=meta-analysis)\n"
+        f"Snippet: {source.snippet[:900]}"
         for idx, source in enumerate(sources, start=1)
     )
 
@@ -230,6 +256,7 @@ Return only JSON:
 }}
 
 If sources are irrelevant or weak, use "insufficient" or "weak". Do not invent sources.
+When evidence is mixed, give more weight to higher-Quality sources (meta-analyses, systematic reviews, position stands, and RCTs > observational > generic web > blogs).
 """.strip()
     raw = await ai_client.generate_text(
         prompt,
@@ -354,6 +381,7 @@ Return only JSON:
 
 If agreement_level is source_disagreement or conclusion_disagreement, final_direction must be mixed and confidence must be low.
 If agreement_level is insufficient_sources, final_direction must be insufficient and confidence must be low.
+When the two checks disagree, prefer the conclusion supported by higher-quality sources (meta-analyses and RCTs from trusted domains).
 """.strip()
     raw = await ai_client.generate_text(
         prompt,
@@ -374,8 +402,298 @@ If agreement_level is insufficient_sources, final_direction must be insufficient
     return _public_agreement_result(agreement)
 
 
+def _no_llm_keys_configured() -> bool:
+    """True when neither primary nor secondary LLM provider has an API key.
+
+    In this case the verifier round can only ever return 'insufficient', so the
+    public surface should fall back to a hand-curated cache or an honest
+    demo-mode message rather than dressing up an empty pipeline as
+    'low-confidence'.
+    """
+    return not (config.OPENAI_API_KEY or config.GROQ_API_KEY)
+
+
+def _sources_from_cache(cached: dict) -> List[SourceCandidate]:
+    sources: List[SourceCandidate] = []
+    for entry in cached.get("evidence", []) or []:
+        study_type = str(entry.get("study_type") or "review")
+        sources.append(
+            SourceCandidate(
+                title=str(entry.get("source_title") or "Curated source"),
+                url=str(entry.get("source_url") or ""),
+                snippet=str(entry.get("relevance_note") or "")[:900],
+                source_type=study_type,
+                year=int(entry["year"]) if isinstance(entry.get("year"), int) else None,
+                provider="curated_cache",
+                quality_score=_CACHE_STUDY_QUALITY.get(study_type, 0.80),
+            )
+        )
+    return sources
+
+
+def _check_from_demo_cache(claim: ExtractedClaimItem) -> ClaimCheckResult | None:
+    """Return a fully-formed ClaimCheckResult if the claim matches a hand-curated
+    demo-cache entry, else None. Bypasses LLM verifiers entirely so showcase
+    claims produce real, directional verdicts when no API key is set."""
+    cached = demo_cache.find_verdict(claim.normalized_claim) or demo_cache.find_verdict(claim.raw_claim)
+    if not cached:
+        return None
+    tier = int(cached.get("tier") or 3)
+    direction: EvidenceDirection = _TIER_TO_DIRECTION.get(tier, "mixed")
+    confidence = str(cached.get("confidence") or "medium")
+    if confidence not in ALLOWED_CONFIDENCE:
+        confidence = "medium"
+    summary = str(cached.get("summary") or "")[:500]
+    why = str(cached.get("why") or summary)[:800]
+    agreement = AgreementResult(
+        agreement_level="strong_agreement",
+        final_direction=direction,
+        confidence=confidence,  # type: ignore[arg-type]
+        summary=summary,
+        why=why,
+    )
+    sources = _sources_from_cache(cached)
+    return ClaimCheckResult(
+        claim=claim,
+        status="ok",
+        sources=sources,
+        agreement=agreement,
+        recommendations=product_recommender.recommend_for_claim(claim),
+    )
+
+
+# Tokens that flip claim polarity. If any appears in the claim text, an
+# 'effect_direction=positive' source actually *supports* the user's framing
+# (e.g., "creatine is safe" → positive safety evidence supports the claim;
+# "creatine is NOT safe" → same positive evidence contradicts the claim).
+_NEGATION_TOKENS = (
+    " no ", " not ", " never ", " doesn't ", " does not ", " don't ", " do not ",
+    " isn't ", " is not ", " won't ", " will not ", " without ", " cannot ", " can't ",
+)
+_SAFETY_FRAMING = ("safe", "safety", "harmless", "side effect", "harm", "harmful",
+                   "dangerous", "damage", "kidney", "liver", "adverse")
+
+
+def _claim_is_negated(claim_text: str) -> bool:
+    padded = f" {claim_text.lower()} "
+    return any(tok in padded for tok in _NEGATION_TOKENS)
+
+
+def _is_safety_framed(claim_text: str) -> bool:
+    return any(tok in claim_text.lower() for tok in _SAFETY_FRAMING)
+
+
+def _map_effect_to_direction(effect: str, *, negated: bool, safety_framed: bool) -> Optional[EvidenceDirection]:
+    """Translate a corpus 'effect_direction' into a public verdict direction
+    given the claim's polarity. Returns None when the mapping is ambiguous."""
+    e = (effect or "").lower()
+    if e in {"positive", "supports"}:
+        base: EvidenceDirection = "supports"
+    elif e in {"negative", "contradicts"}:
+        base = "contradicts"
+    elif e in {"null", "no_effect", "none"}:
+        # No measurable effect. If the claim is *asserting* a strong effect,
+        # this is weak evidence against. If the claim is asserting safety
+        # (where "no effect" actually means "no harmful effect"), it supports.
+        base = "supports" if safety_framed else "weak"
+    elif e in {"mixed", "weak"}:
+        base = "mixed"
+    else:
+        return None
+    if negated:
+        # "creatine does NOT cause hair loss" inverts a contradicts → supports.
+        flip = {
+            "supports": "contradicts",
+            "contradicts": "supports",
+            "partially_supports": "weak",
+            "weak": "partially_supports",
+        }
+        return flip.get(base, base)  # type: ignore[return-value]
+    return base
+
+
+_HEURISTIC_STOP = frozenset({
+    "the", "and", "for", "with", "that", "this", "from", "but", "are", "was",
+    "were", "you", "your", "have", "has", "had", "not", "into", "than", "then",
+    "any", "all", "more", "less", "most", "some", "such", "also", "only", "very",
+    "much", "many", "few", "what", "when", "where", "which", "while", "would",
+    "could", "should", "will", "can", "cannot", "about", "after", "before",
+    "between", "during", "every", "each", "these", "those", "they", "them",
+    "their", "there", "here", "just", "really", "still", "even", "make", "makes",
+    "made", "say", "says", "said", "talk", "talks", "great", "good", "bad",
+})
+
+
+def _meaningful_tokens(text: str, exclude: set[str]) -> set[str]:
+    raw = re.findall(r"[a-z0-9\-]+", (text or "").lower())
+    return {t for t in raw if len(t) > 3 and t not in _HEURISTIC_STOP and t not in exclude}
+
+
+def _claim_topic_overlaps_sources(
+    claim_text: str, sources: List[SourceCandidate], supplement_excludes: set[str]
+) -> bool:
+    """The heuristic should only fire when the claim's actual topic is
+    represented in the retrieved evidence. 'creatine causes cancer' shares
+    only 'creatine' with creatine-safety sources, so we should NOT confuse
+    safety evidence for cancer evidence — return False here and let the
+    sources-only fallback take over."""
+    claim_tokens = _meaningful_tokens(claim_text, supplement_excludes)
+    if not claim_tokens:
+        # Claim was just the supplement name plus stopwords — treat as
+        # a generic question the corpus broadly addresses.
+        return True
+    source_blob = " ".join(
+        f"{src.title or ''} {src.snippet or ''}" for src in sources
+    )
+    source_tokens = _meaningful_tokens(source_blob, supplement_excludes)
+    return bool(claim_tokens & source_tokens)
+
+
+def _heuristic_from_corpus(claim: ExtractedClaimItem, sources: List[SourceCandidate]) -> Optional[AgreementResult]:
+    """Quality-weighted heuristic over curated corpus effect_direction tags.
+
+    Returns None if we don't have enough signal (no curated sources, no topical
+    overlap, or ambiguous polarity). Otherwise returns a real directional
+    AgreementResult that the UI can render confidently."""
+    curated = [
+        s for s in sources
+        if s.provider == "curated_corpus" and s.effect_direction and s.quality_score >= 0.8
+    ]
+    if not curated:
+        return None
+
+    # Build the set of supplement / topic tokens we want to ignore for the
+    # relevance check — these are the "topic anchor" terms (e.g., 'creatine'
+    # for creatine sources), not what the *claim* is asking about.
+    supplement_excludes = set()
+    for src in curated:
+        for slug in (src.source_type, ""):  # placeholder; topic comes from snippet
+            pass
+    # Anchor tokens: any single token that appears in many source titles
+    # is treated as the topic anchor and excluded from the relevance overlap.
+    for term in SUPPLEMENT_TERMS:
+        supplement_excludes.add(term.replace(" ", "").replace("-", ""))
+        supplement_excludes.add(term)
+    # Plus tokens that appear in 50%+ of source titles.
+    if len(curated) >= 2:
+        title_token_counts: dict[str, int] = {}
+        for src in curated:
+            for tok in set(re.findall(r"[a-z0-9\-]+", (src.title or "").lower())):
+                if len(tok) > 3:
+                    title_token_counts[tok] = title_token_counts.get(tok, 0) + 1
+        threshold = max(2, len(curated) // 2)
+        for tok, count in title_token_counts.items():
+            if count >= threshold:
+                supplement_excludes.add(tok)
+
+    safety_framed = _is_safety_framed(claim.normalized_claim)
+    # Safety-framed claims (e.g., "creatine is safe") legitimately use the
+    # whole corpus of safety evidence even if no exact non-anchor token
+    # overlaps. For everything else we require topical overlap.
+    if not safety_framed and not _claim_topic_overlaps_sources(
+        claim.normalized_claim, curated, supplement_excludes
+    ):
+        return None
+
+    negated = _claim_is_negated(claim.normalized_claim)
+
+    bucket: dict[EvidenceDirection, float] = {}
+    for src in curated:
+        direction = _map_effect_to_direction(
+            src.effect_direction or "",
+            negated=negated,
+            safety_framed=safety_framed,
+        )
+        if direction is None:
+            continue
+        bucket[direction] = bucket.get(direction, 0.0) + src.quality_score
+
+    if not bucket:
+        return None
+
+    winner = max(bucket.items(), key=lambda kv: kv[1])
+    total_weight = sum(bucket.values())
+    margin = winner[1] / total_weight if total_weight else 0.0
+    n_supporting = sum(1 for s in curated if _map_effect_to_direction(
+        s.effect_direction or "", negated=negated, safety_framed=safety_framed) == winner[0])
+
+    if n_supporting >= 2 and margin >= 0.6:
+        confidence = "high"
+    elif n_supporting >= 1 and margin >= 0.5:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    direction = winner[0]
+    pretty_dir = _public_direction_label(direction)
+    summary = f"Based on {n_supporting} curated source(s), Veritas rates this claim as {pretty_dir}."
+    why = (
+        f"Veritas used quality-weighted curated evidence (effect direction "
+        f"tags from peer-reviewed studies) to estimate this verdict because "
+        f"no LLM agent ran. For a full two-agent AI fact-check, configure "
+        f"OPENAI_API_KEY or GROQ_API_KEY in backend/.env."
+    )
+    return AgreementResult(
+        agreement_level="strong_agreement" if confidence == "high" else "partial_agreement",
+        final_direction=direction,
+        confidence=confidence,  # type: ignore[arg-type]
+        summary=summary,
+        why=why,
+    )
+
+
+def _demo_no_cache_agreement(sources: List[SourceCandidate]) -> AgreementResult:
+    """Honest fallback when in demo mode (no LLM, no cache match, no heuristic
+    signal). Surfaces the retrieved evidence rather than faking a verdict."""
+    if not sources:
+        return AgreementResult(
+            agreement_level="insufficient_sources",
+            final_direction="insufficient",
+            confidence="low",
+            summary="Veritas could not find evidence for this claim in demo mode.",
+            why="Try a more specific fitness claim, or configure API keys in backend/.env to enable the live AI agents.",
+        )
+    return AgreementResult(
+        agreement_level="insufficient_sources",
+        final_direction="insufficient",
+        confidence="low",
+        summary="Demo mode: relevant sources retrieved but no AI verdict.",
+        why="Veritas pulled the sources above from its curated corpus. Add OPENAI_API_KEY or GROQ_API_KEY to backend/.env and restart to run the live two-agent fact-check pipeline.",
+    )
+
+
 async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
+    # 1) Hand-curated cache always wins for showcase claims so creatine, BCAAs,
+    #    caffeine, ashwagandha, tongkat ali, protein dosing, etc. produce real
+    #    directional verdicts even without any API keys configured.
+    if config.DEMO_MODE:
+        cached_result = _check_from_demo_cache(claim)
+        if cached_result is not None:
+            return cached_result
+
     sources = await source_search.search_sources(claim.normalized_claim, limit=5)
+
+    # 2) Demo mode + no cache match + no LLM keys: don't fake a low-confidence
+    #    LLM verdict.
+    #    2a) First, attempt a quality-weighted heuristic over curated corpus
+    #        effect_direction tags. This catches "creatine is safe" /
+    #        "creatine kidneys" / "fasted cardio" style claims where we have
+    #        high-quality evidence but the verbatim cache match failed.
+    #    2b) If the heuristic can't produce a signal, fall back to the honest
+    #        'sources retrieved, no AI verdict' message.
+    if config.DEMO_MODE and _no_llm_keys_configured():
+        heuristic = _heuristic_from_corpus(claim, sources)
+        agreement = heuristic if heuristic is not None else _demo_no_cache_agreement(sources)
+        status = "no_evidence" if agreement.agreement_level == "insufficient_sources" and not sources else "ok"
+        return ClaimCheckResult(
+            claim=claim,
+            status=status,  # type: ignore[arg-type]
+            sources=sources,
+            agreement=agreement,
+            recommendations=product_recommender.recommend_for_claim(claim),
+        )
+
+    # 3) Live path — two independent LLM verifiers + agreement judge.
     check_a = await _run_verifier(
         claim,
         sources,
