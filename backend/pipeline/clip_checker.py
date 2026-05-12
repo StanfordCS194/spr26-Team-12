@@ -477,7 +477,7 @@ async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
     )
     agreement = await _judge_agreement(claim, sources, check_a, check_b)
     status = "no_evidence" if agreement.agreement_level == "insufficient_sources" else "ok"
-    recommendations = product_recommender.recommend_for_claim(claim)
+    recommendations = await product_recommender.recommend_for_claim(claim)
     return ClaimCheckResult(
         claim=claim,
         status=status,  # type: ignore[arg-type]

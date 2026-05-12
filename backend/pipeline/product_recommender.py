@@ -8,6 +8,7 @@ maps a Veritas claim to a curated catalog of products that meet that bar.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from functools import lru_cache
 from typing import Iterable, List
@@ -83,16 +84,10 @@ def _build_recommendations(keys: Iterable[str], *, limit: int = 3) -> List[Produ
     return products[:limit]
 
 
-def recommend_for_claim(claim: ExtractedClaimItem, *, limit: int = 3) -> List[ProductRecommendation]:
-    """Return verified products related to the supplement(s) in this claim.
-
-    Recommendations are surfaced for any supplement claim where Veritas has
-    a curated catalog entry, regardless of evidence direction. The UI is
-    responsible for adding the appropriate caveat (e.g. "evidence is
-    contradicted") when relevant.
-    """
+async def recommend_for_claim(claim: ExtractedClaimItem, *, limit: int = 3) -> List[ProductRecommendation]:
+    """Return verified products related to the supplement(s) in this claim."""
     text = f"{claim.raw_claim} {claim.normalized_claim}"
     keys = _matched_supplements(text)
     if not keys:
         return []
-    return _build_recommendations(keys, limit=limit)
+    return await asyncio.to_thread(_build_recommendations, keys, limit=limit)
