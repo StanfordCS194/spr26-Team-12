@@ -21,6 +21,7 @@ async def generate_text(
     json_mode: bool = False,
     temperature: float = 0.2,
     timeout: float = 60.0,
+    max_tokens: Optional[int] = None,
 ) -> Optional[str]:
     selected = (provider or config.PRIMARY_LLM_PROVIDER).lower()
     if selected == "openai":
@@ -30,14 +31,7 @@ async def generate_text(
             json_mode=json_mode,
             temperature=temperature,
             timeout=timeout,
-        )
-    if selected == "groq":
-        return await _groq_chat(
-            prompt,
-            system=system,
-            json_mode=json_mode,
-            temperature=temperature,
-            timeout=timeout,
+            max_tokens=max_tokens,
         )
     return None
 
@@ -49,8 +43,10 @@ async def _openai_chat(
     json_mode: bool,
     temperature: float,
     timeout: float,
+    max_tokens: Optional[int] = None,
 ) -> Optional[str]:
     if not config.OPENAI_API_KEY:
+        print("[AI] OpenAI API key not configured — skipping LLM call")
         return None
     payload = {
         "model": config.OPENAI_TEXT_MODEL,
@@ -62,6 +58,8 @@ async def _openai_chat(
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     headers = {"Authorization": f"Bearer {config.OPENAI_API_KEY}"}
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -73,42 +71,8 @@ async def _openai_chat(
             response.raise_for_status()
             data = response.json()
             return data["choices"][0]["message"]["content"].strip() or None
-    except Exception:
-        return None
-
-
-async def _groq_chat(
-    prompt: str,
-    *,
-    system: str,
-    json_mode: bool,
-    temperature: float,
-    timeout: float,
-) -> Optional[str]:
-    if not config.GROQ_API_KEY:
-        return None
-    payload = {
-        "model": config.GROQ_TEXT_MODEL,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": temperature,
-    }
-    if json_mode:
-        payload["response_format"] = {"type": "json_object"}
-    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}"}
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip() or None
-    except Exception:
+    except Exception as exc:
+        print(f"[AI] OpenAI call failed: {exc}")
         return None
 
 

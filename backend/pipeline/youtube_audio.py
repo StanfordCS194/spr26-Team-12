@@ -1,9 +1,9 @@
 """Download audio from YouTube/TikTok/Reddit links via yt-dlp.
 
 Returns the raw bytes plus a sensible filename + content-type so the
-existing Groq Whisper transcription path can consume it without any
-ffmpeg postprocessing (we deliberately avoid re-encoding so the server
-does not need ffmpeg installed).
+OpenAI Whisper transcription path can consume it without any ffmpeg
+postprocessing (we deliberately avoid re-encoding so the server does
+not need ffmpeg installed).
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ class YouTubeDownloadError(RuntimeError):
     pass
 
 
-# Map common audio container extensions to a content-type Groq accepts.
+# Map common audio container extensions to content-types for the transcription API.
 _MIME_BY_EXT = {
     "m4a": "audio/mp4",
     "mp4": "audio/mp4",

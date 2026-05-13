@@ -27,6 +27,32 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
 });
 
+// ── Live scan toggle ──────────────────────────────────────────────────────
+const liveToggleBtn = document.getElementById('liveToggleBtn');
+const liveIndicator = document.getElementById('liveIndicator');
+
+function updateLiveIndicator(enabled) {
+  if (enabled) {
+    liveIndicator.classList.add('live-dot-active');
+    liveToggleBtn.title = 'Live scanning active — click to disable';
+  } else {
+    liveIndicator.classList.remove('live-dot-active');
+    liveToggleBtn.title = 'Live scanning paused — click to enable';
+  }
+}
+
+chrome.storage.sync.get({ liveScanEnabled: true }, ({ liveScanEnabled }) => {
+  updateLiveIndicator(liveScanEnabled);
+});
+
+liveToggleBtn.addEventListener('click', () => {
+  chrome.storage.sync.get({ liveScanEnabled: true }, ({ liveScanEnabled }) => {
+    const newState = !liveScanEnabled;
+    chrome.storage.sync.set({ liveScanEnabled: newState });
+    updateLiveIndicator(newState);
+  });
+});
+
 async function getBase() {
   return new Promise((resolve) => {
     chrome.storage.sync.get({ backendUrl: 'http://localhost:8000' }, ({ backendUrl }) => {

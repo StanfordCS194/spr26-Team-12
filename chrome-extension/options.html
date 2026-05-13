@@ -62,6 +62,27 @@
     }
     .btn-ghost:hover { color: var(--text); }
     .test-status { font-size: 12px; line-height: 36px; color: var(--muted); }
+
+    .toggle-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .toggle-text { font-size: 13px; color: var(--text); }
+    .toggle-label {
+      position: relative; display: inline-block; width: 40px; height: 22px; cursor: pointer;
+    }
+    .toggle-label input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--border); border-radius: 22px;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 16px; height: 16px; left: 3px; bottom: 3px;
+      background: var(--text); border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle-label input:checked + .toggle-slider { background: var(--primary-dk); }
+    .toggle-label input:checked + .toggle-slider::before { transform: translateX(18px); }
+    .scan-stats { font-size: 11px; color: var(--muted); margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -97,6 +118,27 @@
       Default: <code>http://localhost:5173</code> (Vite dev server).
       Update if you deploy the React frontend.
     </p>
+  </section>
+
+  <section>
+    <h2>Live Scan</h2>
+    <div class="toggle-row">
+      <label class="toggle-label" for="liveScanToggle">
+        <input type="checkbox" id="liveScanToggle" checked />
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="toggle-text">Enable live fact-check warnings</span>
+    </div>
+    <p class="hint">
+      When enabled, Veritas automatically scans YouTube, Twitter/X, and TikTok pages
+      for fitness/health claims and shows inline warning overlays. Requires the backend
+      to be running.
+    </p>
+    <div class="scan-stats" id="scanStats"></div>
+    <div class="test-row">
+      <button class="btn-ghost" id="clearCacheBtn">Clear scan cache</button>
+      <span class="test-status" id="cacheStatus"></span>
+    </div>
   </section>
 
   <script src="options.js"></script>

@@ -13,7 +13,10 @@ PROJECT_DIR = BASE_DIR.parent
 
 
 def _load_dotenv() -> None:
-	env_path = PROJECT_DIR / ".env"
+	# Check backend/.env first, then project root .env
+	env_path = BASE_DIR / ".env"
+	if not env_path.exists():
+		env_path = PROJECT_DIR / ".env"
 	if not env_path.exists():
 		return
 	for raw_line in env_path.read_text(encoding="utf-8").splitlines():
@@ -34,15 +37,12 @@ DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
 # Credit-based model providers.
 PRIMARY_LLM_PROVIDER: str = os.getenv("PRIMARY_LLM_PROVIDER", "openai").lower()
-SECONDARY_LLM_PROVIDER: str = os.getenv("SECONDARY_LLM_PROVIDER", "groq").lower()
+SECONDARY_LLM_PROVIDER: str = os.getenv("SECONDARY_LLM_PROVIDER", "openai").lower()
 SEARCH_PROVIDER: str = os.getenv("SEARCH_PROVIDER", "tavily").lower()
 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 OPENAI_TEXT_MODEL: str = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini")
-
-GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-GROQ_TEXT_MODEL: str = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
-GROQ_TRANSCRIPTION_MODEL: str = os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo")
+OPENAI_WHISPER_MODEL: str = os.getenv("OPENAI_WHISPER_MODEL", "whisper-1")
 
 TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 BRAVE_SEARCH_API_KEY: str = os.getenv("BRAVE_SEARCH_API_KEY", "")

@@ -1,4 +1,7 @@
-// Service worker — sets up the context menu and relays selected text to the popup.
+// Service worker — sets up the context menu, relays selected text to the popup,
+// and coordinates live scanning with the backend API (caching + rate limiting).
+
+// ── Context menu setup ────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -13,23 +16,161 @@ chrome.contextMenus.onClicked.addListener((info) => {
   const text = (info.selectionText || '').trim();
   if (!text) return;
 
-  // Store the selected text so the popup picks it up on open.
   chrome.storage.session.set({ pendingText: text });
-
-  // Show a badge so the user knows text is ready even if the popup
-  // doesn't open automatically (openPopup requires Chrome 127+).
   chrome.action.setBadgeText({ text: '!' });
   chrome.action.setBadgeBackgroundColor({ color: '#7c3aed' });
 
-  // Try to open the popup programmatically (Chrome 127+).
   if (chrome.action.openPopup) {
-    chrome.action.openPopup().catch(() => {
-      // Silently ignore — badge already signals the user to click the icon.
-    });
+    chrome.action.openPopup().catch(() => {});
   }
 });
 
-// Clear the badge when the popup is opened manually.
 chrome.action.onClicked.addListener(() => {
   chrome.action.setBadgeText({ text: '' });
+});
+
+// ── Live scan coordination ────────────────────────────────────────────────────
+
+const scanCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100;
+const RATE_LIMIT_MS = 2000;
+let lastScanTime = 0;
+let pendingScans = [];
+let processingQueue = false;
+
+async function getBackendUrl() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get({ backendUrl: 'http://localhost:8000' }, ({ backendUrl }) => {
+      resolve((backendUrl || 'http://localhost:8000').replace(/\/$/, ''));
+    });
+  });
+}
+
+function cleanCache() {
+  const now = Date.now();
+  for (const [key, entry] of scanCache) {
+    if (now - entry.timestamp > CACHE_TTL_MS) {
+      scanCache.delete(key);
+    }
+  }
+  if (scanCache.size > MAX_CACHE_SIZE) {
+    const entries = [...scanCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+    toRemove.forEach(([key]) => scanCache.delete(key));
+  }
+}
+
+async function callQuickScan(text, url, platform, contentType) {
+  const base = await getBackendUrl();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const body = { text: text.slice(0, 5000), url, platform };
+    if (contentType) body.content_type = contentType;
+    const res = await fetch(`${base}/api/claims/quick-scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      return { claims: [], error: `HTTP ${res.status}` };
+    }
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timeout);
+    return { claims: [], error: err.message };
+  }
+}
+
+async function processQueue() {
+  if (processingQueue || pendingScans.length === 0) return;
+  processingQueue = true;
+
+  while (pendingScans.length > 0) {
+    const elapsed = Date.now() - lastScanTime;
+    if (elapsed < RATE_LIMIT_MS) {
+      await new Promise(r => setTimeout(r, RATE_LIMIT_MS - elapsed));
+    }
+
+    const scan = pendingScans.shift();
+    lastScanTime = Date.now();
+
+    try {
+      const result = await callQuickScan(scan.text, scan.url, scan.platform, scan.contentType);
+      const cacheEntry = { claims: result.claims || [], timestamp: Date.now() };
+      scanCache.set(scan.hash, cacheEntry);
+      cleanCache();
+      scan.resolve(cacheEntry);
+    } catch (err) {
+      scan.resolve({ claims: [] });
+    }
+  }
+
+  processingQueue = false;
+}
+
+// ── Message handler ───────────────────────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'LIVE_SCAN') {
+    const { text, url, platform, hash, contentType } = message;
+
+    // Check cache first
+    const cached = scanCache.get(hash);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      sendResponse({ claims: cached.claims, cached: true });
+      return true;
+    }
+
+    // Queue the scan
+    const promise = new Promise((resolve) => {
+      pendingScans.push({ text, url, platform, hash, contentType, resolve });
+    });
+
+    promise.then((result) => {
+      sendResponse({ claims: result.claims || [], cached: false });
+    });
+
+    processQueue();
+    return true; // keep message channel open for async response
+  }
+
+  if (message.type === 'LIVE_DEEP_CHECK') {
+    // Store the text for deep fact-check and open popup
+    chrome.storage.session.set({ pendingText: message.text });
+    chrome.action.setBadgeText({ text: '!' });
+    chrome.action.setBadgeBackgroundColor({ color: '#7c3aed' });
+    if (chrome.action.openPopup) {
+      chrome.action.openPopup().catch(() => {});
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (message.type === 'GET_SCAN_STATS') {
+    sendResponse({
+      cacheSize: scanCache.size,
+      queueLength: pendingScans.length,
+    });
+    return true;
+  }
+
+  if (message.type === 'CLEAR_SCAN_CACHE') {
+    scanCache.clear();
+    sendResponse({ ok: true });
+    return true;
+  }
+});
+
+// ── Badge for live scan status ────────────────────────────────────────────────
+
+chrome.storage.sync.get({ liveScanEnabled: true }, ({ liveScanEnabled }) => {
+  if (liveScanEnabled) {
+    chrome.action.setBadgeText({ text: '' });
+  }
 });

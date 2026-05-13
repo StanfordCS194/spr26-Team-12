@@ -1,15 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Veritas — Fitness Bro Fact Checker",
-  "version": "0.1.0",
-  "description": "Highlight any fitness claim on the web and fact-check it instantly with the Veritas AI pipeline.",
+  "version": "0.2.0",
+  "description": "Live fact-check warnings for fitness claims on YouTube, Twitter/X, and TikTok. Highlight any health claim and verify it instantly.",
   "permissions": [
     "storage",
     "contextMenus",
     "activeTab"
   ],
   "host_permissions": [
-    "http://localhost/*"
+    "http://localhost/*",
+    "https://*.youtube.com/*",
+    "https://*.twitter.com/*",
+    "https://*.x.com/*",
+    "https://*.tiktok.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -32,6 +36,17 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content_script.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://*.twitter.com/*",
+        "https://*.x.com/*",
+        "https://*.tiktok.com/*"
+      ],
+      "js": ["live_scanner.js"],
+      "css": ["live_overlay.css"],
       "run_at": "document_idle"
     }
   ],

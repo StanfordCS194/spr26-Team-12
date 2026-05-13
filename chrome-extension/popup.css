@@ -59,6 +59,8 @@ header {
 .brand-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
 .brand-sub  { font-size: 10px; color: var(--muted); }
 
+.header-actions { display: flex; align-items: center; gap: 6px; }
+
 .icon-btn {
   background: none;
   border: none;
@@ -71,6 +73,24 @@ header {
   transition: color 0.15s;
 }
 .icon-btn:hover { color: var(--text); }
+
+.live-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gray);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.live-dot-active {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse-live 2s infinite;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 
 /* ——— Main content area ——— */
 main { padding: 14px; }
