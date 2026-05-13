@@ -21,13 +21,8 @@ from .models import (
     Verdict,
     VerdictRequest,
 )
-from .pipeline import (
-    clip_checker,
-    credibility_store,
-    extractor,
-    transcriber,
-    verdict as verdict_pipeline,
-)
+from .pipeline import clip_checker, extractor, transcriber, verdict as verdict_pipeline
+from .pipeline import credibility
 
 app = FastAPI(title="Veritas", version="0.2.0")
 
@@ -70,9 +65,9 @@ def process_text_endpoint(payload: dict) -> ProcessResponse:
 
 
 @app.post("/api/process/url", response_model=ProcessResponse)
-def process_url_endpoint(payload: dict) -> ProcessResponse:
+async def process_url_endpoint(payload: dict) -> ProcessResponse:
     try:
-        text, platform = preprocessors.process_url(payload.get("url", ""))
+        text, platform = await preprocessors.process_url(payload.get("url", ""))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return ProcessResponse(text=text, source="link", note=f"platform={platform}")
@@ -160,7 +155,42 @@ async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
         creator_name=req.creator_name,
         brand_name=req.brand_name,
     )
-    # Feature 2: append every claim to the named creator's running history so
-    # their credibility score reflects this clip the next time it's queried.
-    credibility_store.record_report(report)
+    # Feed the credibility ledger (Features 2 & 3) — no-op if no creator name.
+    try:
+        credibility.record_clip(
+            creator_name=req.creator_name,
+            transcript=req.transcript,
+            claim_results=report.claims,
+            source_clip=req.brand_name or None,
+        )
+    except Exception:
+        pass
     return report
+
+
+# --- Feature 2: Influencer credibility -------------------------------------
+@app.get("/api/influencers")
+def list_influencers_endpoint() -> dict:
+    return {"influencers": credibility.list_influencers()}
+
+
+@app.get("/api/influencers/{slug}")
+def get_influencer_endpoint(slug: str) -> dict:
+    inf = credibility.get_influencer(slug)
+    if not inf:
+        raise HTTPException(status_code=404, detail="influencer not found")
+    return inf
+
+
+# --- Feature 3: Product credibility ----------------------------------------
+@app.get("/api/products")
+def list_products_endpoint() -> dict:
+    return {"products": credibility.list_products()}
+
+
+@app.get("/api/products/{product_id}")
+def get_product_endpoint(product_id: str) -> dict:
+    prod = credibility.get_product(product_id)
+    if not prod:
+        raise HTTPException(status_code=404, detail="product not found")
+    return prod

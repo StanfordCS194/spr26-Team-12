@@ -662,6 +662,94 @@ def _demo_no_cache_agreement(sources: List[SourceCandidate]) -> AgreementResult:
     )
 
 
+SUMMARY_TRIGGER_LEN = 320
+
+
+def _heuristic_source_summary(snippet: str) -> str:
+    sentences = re.split(r"(?<=[.!?])\s+", snippet.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return snippet[:240]
+    pick: List[str] = [sentences[0]]
+    for sentence in reversed(sentences):
+        lowered = sentence.lower()
+        if any(
+            cue in lowered
+            for cue in ("conclusion", "in summary", "in conclusion", "we found", "results show")
+        ):
+            if sentence not in pick:
+                pick.append(sentence)
+            break
+    summary = " ".join(pick)
+    return summary[:320]
+
+
+async def _attach_source_summaries(
+    claim: ExtractedClaimItem,
+    sources: List[SourceCandidate],
+) -> None:
+    """Populate `summary` on long-form sources so the UI shows a tight 1-2
+    sentence takeaway instead of a copy-pasted abstract."""
+    targets = [
+        (idx, source)
+        for idx, source in enumerate(sources)
+        if source.summary == "" and len(source.snippet) > SUMMARY_TRIGGER_LEN
+    ]
+    if not targets:
+        return
+
+    payload_sources = [
+        {"index": idx, "title": source.title, "snippet": source.snippet[:1400]}
+        for idx, source in targets
+    ]
+    prompt = f"""
+Summarize each scientific source below in 1-2 plain-English sentences,
+focused on what it concludes about this fitness claim.
+
+Claim: {claim.normalized_claim}
+
+Rules:
+- Be concrete (mention the finding, not the methodology).
+- No filler ("This study examines...").
+- 280 characters max per summary.
+- Return JSON only.
+
+Sources:
+{json.dumps(payload_sources)}
+
+JSON schema:
+{{ "summaries": [ {{ "index": 0, "summary": "..." }} ] }}
+""".strip()
+
+    parsed: dict | None = None
+    try:
+        raw = await ai_client.generate_text(
+            prompt,
+            provider=config.PRIMARY_LLM_PROVIDER,
+            system="You write tight, factual one-sentence summaries of scientific sources. Return valid JSON.",
+            json_mode=True,
+            temperature=0.1,
+            timeout=45.0,
+        )
+        parsed = ai_client.parse_json_loose(raw or "")
+    except Exception:
+        parsed = None
+
+    summaries_by_index: dict[int, str] = {}
+    if isinstance(parsed, dict):
+        for entry in parsed.get("summaries", []) or []:
+            try:
+                idx = int(entry.get("index"))
+            except (TypeError, ValueError):
+                continue
+            summary_text = str(entry.get("summary") or "").strip()
+            if summary_text:
+                summaries_by_index[idx] = summary_text[:320]
+
+    for idx, source in targets:
+        source.summary = summaries_by_index.get(idx) or _heuristic_source_summary(source.snippet)
+
+
 async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
     # 1) Hand-curated cache always wins for showcase claims so creatine, BCAAs,
     #    caffeine, ashwagandha, tongkat ali, protein dosing, etc. produce real
@@ -694,6 +782,8 @@ async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
         )
 
     # 3) Live path — two independent LLM verifiers + agreement judge.
+    #    Pre-attach 1-2 sentence AI summaries to long-form sources for the UI.
+    await _attach_source_summaries(claim, sources)
     check_a = await _run_verifier(
         claim,
         sources,
@@ -706,7 +796,7 @@ async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
     )
     agreement = await _judge_agreement(claim, sources, check_a, check_b)
     status = "no_evidence" if agreement.agreement_level == "insufficient_sources" else "ok"
-    recommendations = product_recommender.recommend_for_claim(claim)
+    recommendations = await product_recommender.recommend_for_claim(claim)
     return ClaimCheckResult(
         claim=claim,
         status=status,  # type: ignore[arg-type]

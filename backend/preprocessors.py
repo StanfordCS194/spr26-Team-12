@@ -31,25 +31,45 @@ def detect_platform(url: str) -> str:
     return "article"
 
 
-def process_url(url: str) -> Tuple[str, str]:
-    """Return (text, platform). Falls back to URL itself if scrapers are
-    not installed; the LLM/heuristic still produces a claim from the URL."""
+async def process_url(url: str) -> Tuple[str, str]:
+    """Return (text, platform).
+
+    - article: scrape via trafilatura.
+    - youtube/tiktok/reddit: download audio with yt-dlp, transcribe via Groq Whisper.
+    Falls back to a stub string only if every path fails so the UI still progresses.
+    """
     if not _URL_RE.match(url or ""):
         raise ValueError("Not a valid URL.")
     platform = detect_platform(url)
     text: Optional[str] = None
-    try:
-        if platform == "article":
+
+    if platform == "article":
+        try:
             import trafilatura  # type: ignore
 
             downloaded = trafilatura.fetch_url(url)
             if downloaded:
                 text = trafilatura.extract(downloaded) or None
-    except Exception:
-        text = None
+        except Exception:
+            text = None
+    else:
+        # video / social platforms — fetch audio and transcribe.
+        try:
+            import asyncio
+
+            from .pipeline import youtube_audio
+            from .pipeline import transcriber
+
+            max_bytes = config.MAX_AUDIO_MB * 1024 * 1024
+            data, filename, mime = await asyncio.to_thread(
+                youtube_audio.download_audio, url, max_bytes
+            )
+            text = await transcriber.transcribe_audio(filename, mime, data)
+        except Exception as exc:
+            # Surface the real error to the API caller so users know why.
+            raise ValueError(f"Could not transcribe {platform} link: {exc}")
 
     if not text:
-        # graceful fallback so the UI still progresses
         text = f"Claim from {platform} link: {url}"
     return text[: config.MAX_INPUT_CHARS], platform
 

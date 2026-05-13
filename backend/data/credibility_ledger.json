@@ -1,0 +1,211 @@
+[
+  {
+    "influencer_slug": "jeff-nippard",
+    "claim": "Creatine monohydrate is one of the most studied and effective supplements for strength and hypertrophy.",
+    "direction": "supports",
+    "confidence": "high",
+    "supplements": [
+      "creatine"
+    ],
+    "source_clip": "Creatine Myths Debunked",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "jeff-nippard",
+    "claim": "BCAA supplementation provides little benefit when total protein intake is adequate.",
+    "direction": "supports",
+    "confidence": "high",
+    "supplements": [
+      "bcaa",
+      "whey_protein"
+    ],
+    "source_clip": "Are BCAAs a Waste of Money?",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "jeff-nippard",
+    "claim": "Whey protein is the gold-standard post-workout protein source for muscle protein synthesis.",
+    "direction": "supports",
+    "confidence": "high",
+    "supplements": [
+      "whey_protein"
+    ],
+    "source_clip": "Best Protein Powder?",
+    "ts": 1714372800
+  },
+  {
+    "influencer_slug": "athleanx",
+    "claim": "Creatine causes water retention but not fat gain.",
+    "direction": "supports",
+    "confidence": "high",
+    "supplements": [
+      "creatine"
+    ],
+    "source_clip": "Creatine Side Effects",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "athleanx",
+    "claim": "Tongkat ali doubles testosterone in healthy men.",
+    "direction": "contradicts",
+    "confidence": "medium",
+    "supplements": [
+      "tongkat_ali"
+    ],
+    "source_clip": "Test Booster Reviews",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "andrew-huberman",
+    "claim": "Tongkat ali raises free testosterone meaningfully in healthy men.",
+    "direction": "weak",
+    "confidence": "low",
+    "supplements": [
+      "tongkat_ali"
+    ],
+    "source_clip": "Hormone Optimization",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "andrew-huberman",
+    "claim": "Ashwagandha (KSM-66) lowers cortisol and improves sleep quality.",
+    "direction": "supports",
+    "confidence": "medium",
+    "supplements": [
+      "ashwagandha"
+    ],
+    "source_clip": "Stress & Sleep Toolkit",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "andrew-huberman",
+    "claim": "Fish oil reduces inflammation and supports cognitive function.",
+    "direction": "partially_supports",
+    "confidence": "medium",
+    "supplements": [
+      "fish_oil"
+    ],
+    "source_clip": "Omega-3 Protocol",
+    "ts": 1714372800
+  },
+  {
+    "influencer_slug": "mike-israetel",
+    "claim": "Creatine monohydrate is the single most effective legal supplement for muscle gain.",
+    "direction": "supports",
+    "confidence": "high",
+    "supplements": [
+      "creatine"
+    ],
+    "source_clip": "Supplements That Actually Work",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "mike-israetel",
+    "claim": "Caffeine pre-workout reliably increases training performance.",
+    "direction": "supports",
+    "confidence": "high",
+    "supplements": [
+      "caffeine"
+    ],
+    "source_clip": "Pre-Workout Truth",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "greg-doucette",
+    "claim": "Most pre-workouts are overpriced caffeine.",
+    "direction": "supports",
+    "confidence": "medium",
+    "supplements": [
+      "caffeine"
+    ],
+    "source_clip": "Pre-Workout Tier List",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "greg-doucette",
+    "claim": "BCAAs are necessary for muscle growth.",
+    "direction": "contradicts",
+    "confidence": "high",
+    "supplements": [
+      "bcaa"
+    ],
+    "source_clip": "BCAA Marketing Lies",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "liver-king",
+    "claim": "Eating raw organ meats provides hormones and nutrients no supplement can replicate.",
+    "direction": "weak",
+    "confidence": "medium",
+    "supplements": [],
+    "source_clip": "Ancestral Living",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "liver-king",
+    "claim": "His physique was built without exogenous hormones.",
+    "direction": "contradicts",
+    "confidence": "high",
+    "supplements": [],
+    "source_clip": "Natural Lifestyle",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "liver-king",
+    "claim": "Ancestral tenets alone produce his level of muscularity.",
+    "direction": "contradicts",
+    "confidence": "high",
+    "supplements": [],
+    "source_clip": "Nine Ancestral Tenets",
+    "ts": 1714372800
+  },
+  {
+    "influencer_slug": "thomas-delauer",
+    "claim": "Intermittent fasting causes greater fat loss than equivalent-calorie continuous diets.",
+    "direction": "contradicts",
+    "confidence": "medium",
+    "supplements": [],
+    "source_clip": "IF for Fat Loss",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "thomas-delauer",
+    "claim": "Magnesium glycinate before bed improves sleep quality.",
+    "direction": "partially_supports",
+    "confidence": "low",
+    "supplements": [
+      "magnesium"
+    ],
+    "source_clip": "Sleep Stack",
+    "ts": 1714286400
+  },
+  {
+    "influencer_slug": "thomas-delauer",
+    "claim": "MCT oil triggers ketosis and improves fat loss.",
+    "direction": "weak",
+    "confidence": "low",
+    "supplements": [],
+    "source_clip": "Keto Tools",
+    "ts": 1714372800
+  },
+  {
+    "influencer_slug": "sam-sulek",
+    "claim": "Eating large quantities of fast food is fine for hypertrophy if calories and protein are met.",
+    "direction": "partially_supports",
+    "confidence": "low",
+    "supplements": [
+      "whey_protein"
+    ],
+    "source_clip": "Day in the Life",
+    "ts": 1714200000
+  },
+  {
+    "influencer_slug": "sam-sulek",
+    "claim": "His physique is achievable naturally on his stated training and diet alone.",
+    "direction": "contradicts",
+    "confidence": "medium",
+    "supplements": [],
+    "source_clip": "Bulking Vlog",
+    "ts": 1714286400
+  }
+]
