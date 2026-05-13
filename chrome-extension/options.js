@@ -9,7 +9,7 @@ const testStatus    = document.getElementById('testStatus');
 
 // Load saved values
 chrome.storage.sync.get(
-  { backendUrl: 'http://localhost:8000', frontendUrl: 'http://localhost:5173' },
+  { backendUrl: 'http://localhost:8000', frontendUrl: 'https://veritas-ruby.vercel.app' },
   ({ backendUrl, frontendUrl }) => {
     backendInput.value  = backendUrl;
     frontendInput.value = frontendUrl;
@@ -19,7 +19,7 @@ chrome.storage.sync.get(
 // Save
 saveBtn.addEventListener('click', () => {
   const backendUrl  = backendInput.value.trim()  || 'http://localhost:8000';
-  const frontendUrl = frontendInput.value.trim() || 'http://localhost:5173';
+  const frontendUrl = frontendInput.value.trim() || 'https://veritas-ruby.vercel.app';
   chrome.storage.sync.set({ backendUrl, frontendUrl }, () => {
     saveStatus.textContent = 'Saved!';
     setTimeout(() => { saveStatus.textContent = ''; }, 2000);

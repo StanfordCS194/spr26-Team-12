@@ -98,6 +98,10 @@ class SourceCandidate(BaseModel):
     year: Optional[int] = None
     provider: str = "unknown"
     quality_score: float = 0.5
+    # Curated corpus tags the direction of evidence (positive/negative/null/mixed)
+    # which downstream demo heuristics use when no LLM is available. Optional so
+    # web/PubMed sources without this metadata remain valid.
+    effect_direction: Optional[str] = None
 
 
 class AgentVerdict(BaseModel):

@@ -1,7 +1,92 @@
 {
   "showcase": [
     {
-      "match": ["creatine", "hair loss"],
+      "match": [
+        ["creatine"],
+        ["safe", "safety", "harmful", "dangerous", "harm", "side effect", "side effects", "adverse"]
+      ],
+      "extracted_claim": "Creatine supplementation is safe for healthy adults.",
+      "verdict": {
+        "tier": 5,
+        "summary": "Creatine monohydrate is one of the most studied supplements ever; long- and short-term use is safe in healthy adults at standard doses.",
+        "effect_size": "no clinically meaningful adverse effects in healthy users",
+        "dose": "3-5 g/day maintenance",
+        "population": "healthy adults across age groups",
+        "confidence": "high",
+        "why": "Multiple position stands and reviews — including the ISSN's 2021 position stand and Kreider et al.'s 2017 review of 70+ years of research — find no evidence of kidney or liver damage, dehydration, cramping, or hair loss in healthy users at standard 3-5 g/day doses. The most common 'side effect' is small weight gain from intracellular water.",
+        "evidence": [
+          {"source_title": "Antonio et al. — ISSN position stand: creatine safety and efficacy", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-021-00412-w", "study_type": "position_stand", "year": 2021, "sample_size": null, "population": "general adult", "relevance_note": "Most authoritative safety statement; addresses every common myth."},
+          {"source_title": "Kreider et al. — Safety and efficacy of creatine supplementation (review)", "source_url": "https://pubmed.ncbi.nlm.nih.gov/28615996/", "study_type": "review", "year": 2017, "sample_size": null, "population": "healthy and clinical", "relevance_note": "Reviews 70+ years of safety data; no kidney/liver damage at standard doses."},
+          {"source_title": "NIH ODS — Creatine fact sheet", "source_url": "https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-HealthProfessional/", "study_type": "fact_sheet", "year": 2024, "sample_size": null, "population": "general", "relevance_note": "Government fact sheet, lists side effects honestly; nothing serious for healthy users."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["creatine"],
+        ["kidney", "kidneys", "renal", "liver"]
+      ],
+      "extracted_claim": "Creatine damages the kidneys or liver in healthy adults.",
+      "verdict": {
+        "tier": 1,
+        "summary": "Creatine does not damage kidneys or liver in healthy adults at standard doses; the myth comes from elevated creatinine readings being mistaken for kidney injury.",
+        "effect_size": "no documented kidney or liver damage in healthy users",
+        "dose": "3-5 g/day maintenance",
+        "population": "healthy adults",
+        "confidence": "high",
+        "why": "Creatine supplementation raises serum creatinine (a normal breakdown product) which can look like a kidney issue on a lab panel, but renal function (eGFR, cystatin C) stays normal. Long-term trials up to 5 years at 30 g/day in healthy individuals find no organ damage.",
+        "evidence": [
+          {"source_title": "Kreider et al. — Safety and efficacy of creatine supplementation (review)", "source_url": "https://pubmed.ncbi.nlm.nih.gov/28615996/", "study_type": "review", "year": 2017, "sample_size": null, "population": "healthy and clinical", "relevance_note": "Explicitly addresses kidney/liver myths; no damage found."},
+          {"source_title": "Antonio et al. — ISSN position stand: creatine safety and efficacy", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-021-00412-w", "study_type": "position_stand", "year": 2021, "sample_size": null, "population": "general adult", "relevance_note": "Position stand confirms renal safety at standard doses."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["creatine"],
+        ["water retention", "bloat", "bloated", "water weight", "puffy"]
+      ],
+      "extracted_claim": "Creatine causes subcutaneous bloat and visible water retention.",
+      "verdict": {
+        "tier": 3,
+        "summary": "Creatine increases intracellular water (inside muscle cells), not subcutaneous bloat. The early weight gain is muscle hydration, not 'puffiness'.",
+        "effect_size": "+1-2 kg intracellular water in first weeks",
+        "dose": "3-5 g/day; loading 20 g/day for 5-7 days accelerates",
+        "population": "responders (~70% of users)",
+        "confidence": "high",
+        "why": "The water creatine pulls in is intramuscular — under the skin, inside the cell. Subcutaneous water retention (the 'puffy' look) is not a documented creatine effect at standard doses. After the first 2-4 weeks the visible weight gain stabilizes.",
+        "evidence": [
+          {"source_title": "Antonio et al. — ISSN position stand: creatine safety and efficacy", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-021-00412-w", "study_type": "position_stand", "year": 2021, "sample_size": null, "population": "general adult", "relevance_note": "Documents intracellular vs subcutaneous water distinction."},
+          {"source_title": "Kreider et al. — Safety and efficacy of creatine supplementation (review)", "source_url": "https://pubmed.ncbi.nlm.nih.gov/28615996/", "study_type": "review", "year": 2017, "sample_size": null, "population": "healthy and clinical", "relevance_note": "Quantifies typical 1-2 kg early intracellular water gain."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["creatine"],
+        ["brain", "cognition", "cognitive", "memory", "huberman", "sleep deprivation", "sleep-deprived"]
+      ],
+      "extracted_claim": "Creatine improves cognitive performance, especially when sleep-deprived or stressed.",
+      "verdict": {
+        "tier": 4,
+        "summary": "Creatine produces small but real cognitive benefits, with the largest effects in sleep-deprived, stressed, or vegetarian populations.",
+        "effect_size": "small effects on working memory and reasoning; larger under sleep deprivation",
+        "dose": "5 g/day; some cognitive studies use 10-20 g/day acutely",
+        "population": "adults, with bigger effects in vegetarians and sleep-deprived",
+        "confidence": "medium",
+        "why": "Meta-analyses on creatine and cognition find small but consistent benefits, most pronounced in vegetarians (lower baseline brain creatine) and in stress states like sleep deprivation. Effects in well-fed, well-rested omnivores are real but modest.",
+        "evidence": [
+          {"source_title": "Avgerinos et al. — Creatine and cognitive function (meta-analysis)", "source_url": "https://pubmed.ncbi.nlm.nih.gov/30086660/", "study_type": "meta_analysis", "year": 2018, "sample_size": null, "population": "healthy adults", "relevance_note": "Small but significant pooled cognitive benefit."},
+          {"source_title": "Antonio et al. — ISSN position stand: creatine safety and efficacy", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-021-00412-w", "study_type": "position_stand", "year": 2021, "sample_size": null, "population": "general adult", "relevance_note": "Notes emerging cognitive applications."},
+          {"source_title": "Gordji-Nejad et al. — Single dose creatine improves cognition under sleep deprivation", "source_url": "https://pubmed.ncbi.nlm.nih.gov/38388570/", "study_type": "rct", "year": 2024, "sample_size": 15, "population": "sleep-deprived adults", "relevance_note": "Demonstrated acute cognitive rescue from a single dose."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["creatine"],
+        ["hair loss", "hair", "bald", "balding", "alopecia", "dht"]
+      ],
       "extracted_claim": "Creatine supplementation causes hair loss in healthy adult men.",
       "verdict": {
         "tier": 2,
@@ -19,7 +104,10 @@
       }
     },
     {
-      "match": ["ashwagandha", "testosterone"],
+      "match": [
+        ["ashwagandha"],
+        ["testosterone", "t levels", "test boost"]
+      ],
       "extracted_claim": "Ashwagandha increases testosterone by 40% in healthy adult men.",
       "verdict": {
         "tier": 2,
@@ -37,7 +125,10 @@
       }
     },
     {
-      "match": ["bcaa", "muscle"],
+      "match": [
+        ["bcaa", "branched-chain", "branched chain"],
+        ["muscle", "build", "gain", "required", "necessary", "hypertrophy"]
+      ],
       "extracted_claim": "BCAAs build muscle in adults eating adequate protein.",
       "verdict": {
         "tier": 2,
@@ -55,7 +146,9 @@
       }
     },
     {
-      "match": ["beta-alanine"],
+      "match": [
+        ["beta-alanine", "beta alanine"]
+      ],
       "extracted_claim": "Beta-alanine improves high-rep exercise performance.",
       "verdict": {
         "tier": 4,
@@ -73,7 +166,10 @@
       }
     },
     {
-      "match": ["caffeine", "strength"],
+      "match": [
+        ["caffeine"],
+        ["strength", "power", "performance", "lift", "1rm"]
+      ],
       "extracted_claim": "Caffeine improves strength performance.",
       "verdict": {
         "tier": 5,
@@ -91,7 +187,9 @@
       }
     },
     {
-      "match": ["tongkat"],
+      "match": [
+        ["tongkat", "eurycoma", "longjack"]
+      ],
       "extracted_claim": "Tongkat ali boosts testosterone 200% in healthy men.",
       "verdict": {
         "tier": 2,
@@ -105,6 +203,140 @@
           {"source_title": "Tambi et al. — Tongkat ali in late-onset hypogonadism", "source_url": "https://pubmed.ncbi.nlm.nih.gov/21671978/", "study_type": "rct", "year": 2012, "sample_size": 76, "population": "hypogonadal men", "relevance_note": "Restoration toward normal range, not a 200% boost."},
           {"source_title": "Talbott et al. — Tongkat ali and stress hormones", "source_url": "https://pubmed.ncbi.nlm.nih.gov/23754792/", "study_type": "rct", "year": 2013, "sample_size": 63, "population": "stressed adults", "relevance_note": "Modest hormonal shifts in stressed cohort."},
           {"source_title": "Examine-style review of tongkat ali (NIH ODS adjacent)", "source_url": "https://ods.od.nih.gov/", "study_type": "review", "year": 2023, "sample_size": null, "population": "general", "relevance_note": "Notes lack of large trials in healthy men."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["protein"],
+        ["per pound", "per kilo", "per kilogram", "1g/lb", "1 g/lb", "2.2 g/kg", "gram per pound", "grams per pound", "1 gram per", "one gram per"]
+      ],
+      "extracted_claim": "You need 1 gram of protein per pound of bodyweight to build muscle.",
+      "verdict": {
+        "tier": 2,
+        "summary": "Above roughly 1.6 g/kg/day (~0.7 g/lb), extra protein produces no additional muscle gain. The popular '1 g per pound' rule is conservative but not necessary.",
+        "effect_size": "no additional gains beyond ~1.6 g/kg/day",
+        "dose": "1.4-2.0 g/kg/day is sufficient for most athletes",
+        "population": "trained and untrained adults",
+        "confidence": "high",
+        "why": "A 2018 meta-analysis pooling 49 RCTs (n=1,863) identified a plateau in fat-free mass gains around 1.6 g/kg/day. The ISSN position stand recommends 1.4-2.0 g/kg/day, well below the '1 g per pound' (2.2 g/kg) target. Eating more isn't harmful but isn't required for hypertrophy.",
+        "evidence": [
+          {"source_title": "Morton et al. — Protein intake and resistance training meta-analysis", "source_url": "https://pubmed.ncbi.nlm.nih.gov/28698222/", "study_type": "meta_analysis", "year": 2018, "sample_size": 1863, "population": "training adults", "relevance_note": "Identified ~1.6 g/kg/day plateau."},
+          {"source_title": "Jäger et al. — ISSN position stand: protein and exercise", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-017-0177-8", "study_type": "position_stand", "year": 2017, "sample_size": null, "population": "athletes", "relevance_note": "Recommends 1.4-2.0 g/kg/day for most athletes."},
+          {"source_title": "Schoenfeld et al. — Nutrient timing and the anabolic window", "source_url": "https://pubmed.ncbi.nlm.nih.gov/23360586/", "study_type": "review", "year": 2013, "sample_size": null, "population": "trained adults", "relevance_note": "Total daily intake matters more than timing or extreme totals."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["fasted", "fasting"],
+        ["cardio", "training", "morning", "burn"]
+      ],
+      "extracted_claim": "Fasted cardio burns more fat than fed cardio.",
+      "verdict": {
+        "tier": 2,
+        "summary": "Fasted cardio shifts acute fuel use toward fat but does not produce more long-term fat loss when total calories are matched.",
+        "effect_size": "no meaningful body composition difference vs fed cardio",
+        "dose": "30-60 min steady-state cardio",
+        "population": "adults on calorie-controlled diets",
+        "confidence": "high",
+        "why": "Schoenfeld's 4-week RCT in 20 dieting women found identical fat and lean-mass changes between fasted and fed steady-state cardio. The 'fat oxidation' fasted cardio is famous for refers to substrate use during the bout, not 24-hour or weekly fat balance.",
+        "evidence": [
+          {"source_title": "Schoenfeld et al. — Body composition with fasted vs fed aerobic exercise", "source_url": "https://pubmed.ncbi.nlm.nih.gov/25429252/", "study_type": "rct", "year": 2014, "sample_size": 20, "population": "young women, hypocaloric", "relevance_note": "No body composition advantage to fasted cardio when calories matched."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["intermittent fasting", "16:8", "16/8", "time restricted", "time-restricted", "tre"]
+      ],
+      "extracted_claim": "Intermittent fasting produces more fat loss than regular calorie restriction.",
+      "verdict": {
+        "tier": 3,
+        "summary": "Intermittent fasting is not metabolically superior to standard calorie restriction; effects are largely explained by reduced total intake.",
+        "effect_size": "no metabolic advantage when calories are matched",
+        "dose": "16:8 or alternate-day fasting",
+        "population": "general overweight adults",
+        "confidence": "high",
+        "why": "Reviews and trials such as the Lowe et al. 2020 TREAT study show only small differences vs continuous restriction. Lowe found ~1 kg additional loss in the 16:8 group, with about 65% coming from lean mass. IF may help adherence for some but isn't a unique fat-loss mechanism.",
+        "evidence": [
+          {"source_title": "Tinsley & Bounty — Intermittent fasting and body composition review", "source_url": "https://pubmed.ncbi.nlm.nih.gov/26374764/", "study_type": "review", "year": 2015, "sample_size": null, "population": "general adult", "relevance_note": "Effects explained by total calorie intake."},
+          {"source_title": "Lowe et al. — TREAT randomized clinical trial: 16:8 TRE", "source_url": "https://pubmed.ncbi.nlm.nih.gov/32986097/", "study_type": "rct", "year": 2020, "sample_size": 116, "population": "overweight adults", "relevance_note": "Only modest loss; ~65% from lean mass."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["anabolic window", "post-workout window", "post workout window", "30 minute", "30-minute"]
+      ],
+      "extracted_claim": "You must eat protein within 30 minutes of training to build muscle.",
+      "verdict": {
+        "tier": 2,
+        "summary": "The rigid 30-minute post-workout 'anabolic window' is overstated. Total daily protein and calories dominate long-term hypertrophy.",
+        "effect_size": "no advantage to extreme post-workout timing in trained adults",
+        "dose": "0.25-0.40 g/kg protein per meal, 3-4 meals/day",
+        "population": "trained adults",
+        "confidence": "high",
+        "why": "Schoenfeld's narrative review on nutrient timing concludes that as long as protein is consumed within a few hours surrounding training (pre or post), exact timing has little measurable effect on hypertrophy in trained individuals.",
+        "evidence": [
+          {"source_title": "Schoenfeld et al. — Nutrient timing and the anabolic window", "source_url": "https://pubmed.ncbi.nlm.nih.gov/23360586/", "study_type": "review", "year": 2013, "sample_size": null, "population": "trained adults", "relevance_note": "Window is wider than 30-60 minutes."},
+          {"source_title": "Jäger et al. — ISSN position stand: protein and exercise", "source_url": "https://jissn.biomedcentral.com/articles/10.1186/s12970-017-0177-8", "study_type": "position_stand", "year": 2017, "sample_size": null, "population": "athletes", "relevance_note": "Recommends distributing protein across meals, not racing the clock."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["spot reduction", "target fat", "belly fat", "ab exercise"]
+      ],
+      "extracted_claim": "You can spot-reduce fat from a specific body area with targeted exercise.",
+      "verdict": {
+        "tier": 1,
+        "summary": "Targeted exercise does not preferentially remove subcutaneous fat from the trained area.",
+        "effect_size": "no preferential local fat loss",
+        "dose": "n/a",
+        "population": "untrained and trained adults",
+        "confidence": "high",
+        "why": "Kostek et al.'s 12-week unilateral arm training study used DEXA imaging and found similar fat reductions in trained and untrained limbs. Fat-loss patterns are determined primarily by overall energy deficit and individual physiology, not by which muscle worked.",
+        "evidence": [
+          {"source_title": "Kostek et al. — Subcutaneous fat alterations with unilateral resistance training", "source_url": "https://pubmed.ncbi.nlm.nih.gov/17414804/", "study_type": "rct", "year": 2007, "sample_size": 104, "population": "untrained young adults", "relevance_note": "Trained arm did not lose more fat than untrained arm."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["training frequency", "twice per week", "once per week", "twice a week", "once a week"]
+      ],
+      "extracted_claim": "Training each muscle twice a week is better than once a week for hypertrophy.",
+      "verdict": {
+        "tier": 4,
+        "summary": "Training each muscle group twice per week produces greater hypertrophy than once per week when weekly volume is equated.",
+        "effect_size": "small but reliable advantage to 2x/week",
+        "dose": "equal weekly hard-set count, distributed across 2+ sessions",
+        "population": "trained and untrained adults",
+        "confidence": "high",
+        "why": "Schoenfeld's 2016 meta-analysis on training frequency found that, with weekly sets matched, 2x/week split outperformed 1x/week. Going from 2x to 3x produced little additional benefit. Volume matters more than frequency per se.",
+        "evidence": [
+          {"source_title": "Schoenfeld et al. — Resistance training frequency meta-analysis", "source_url": "https://pubmed.ncbi.nlm.nih.gov/27102172/", "study_type": "meta_analysis", "year": 2016, "sample_size": null, "population": "trained adults", "relevance_note": "Twice/week beats once/week with matched volume."}
+        ]
+      }
+    },
+    {
+      "match": [
+        ["lactic acid", "lactate"],
+        ["soreness", "burn", "sore", "doms"]
+      ],
+      "extracted_claim": "Lactic acid causes muscle soreness the day after training.",
+      "verdict": {
+        "tier": 1,
+        "summary": "Lactic acid does not cause delayed-onset muscle soreness. Lactate is cleared within an hour.",
+        "effect_size": "no causal link to DOMS",
+        "dose": "n/a",
+        "population": "general adult",
+        "confidence": "high",
+        "why": "Cheung et al. and Cairns review the mechanisms: DOMS arises from mechanical micro-trauma during unaccustomed eccentric loading, not metabolic acidosis. By the time soreness peaks 24-72h later, lactate is long gone.",
+        "evidence": [
+          {"source_title": "Cheung et al. — Delayed onset muscle soreness review", "source_url": "https://pubmed.ncbi.nlm.nih.gov/12617692/", "study_type": "review", "year": 2003, "sample_size": null, "population": "general adult", "relevance_note": "Mechanical micro-trauma, not lactic acid, causes DOMS."},
+          {"source_title": "Cairns — Lactic acid and exercise performance review", "source_url": "https://pubmed.ncbi.nlm.nih.gov/16573355/", "study_type": "review", "year": 2006, "sample_size": null, "population": "athletes", "relevance_note": "Reframes lactate as fuel, not fatigue toxin."}
         ]
       }
     }
