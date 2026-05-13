@@ -575,7 +575,23 @@ function renderReport() {
 
   document.getElementById('openAppBtn').addEventListener('click', () => {
     chrome.storage.sync.get({ frontendUrl: 'https://veritas-ruby.vercel.app' }, ({ frontendUrl }) => {
-      chrome.tabs.create({ url: frontendUrl || 'https://veritas-ruby.vercel.app' });
+      const base = (frontendUrl || 'https://veritas-ruby.vercel.app').replace(/\/$/, '');
+      const params = new URLSearchParams();
+      // Pre-populate the web app's textarea with whatever the user just
+      // checked in the extension. Use transcript when present (it's the
+      // normalized form), otherwise fall back to the original input.
+      // Prefer the normalized transcript we sent to the backend, but fall
+      // back to the raw textarea contents (covers the case where the user
+      // hits "Open full app" before running Extract).
+      const textareaEl = document.getElementById('inputText');
+      const handoffText = (transcript || (textareaEl && textareaEl.value) || '').trim();
+      if (handoffText) params.set('text', handoffText.slice(0, 12000));
+      const creatorEl = document.getElementById('creatorInput');
+      const handoffCreator = (creatorName || (creatorEl && creatorEl.value) || '').trim();
+      if (handoffCreator) params.set('creator', handoffCreator.slice(0, 120));
+      params.set('source', 'extension');
+      const query = params.toString();
+      chrome.tabs.create({ url: query ? `${base}/?${query}` : base });
     });
   });
 }

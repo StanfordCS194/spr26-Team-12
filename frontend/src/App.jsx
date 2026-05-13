@@ -845,6 +845,28 @@ export default function App() {
     if (view === 'roster') loadRoster();
   }, [view, rosterMin]);
 
+  // Pick up text handed off from the Chrome extension's "Open full app" button.
+  // The extension forwards ?text=...&creator=...&source=... (and optionally
+  // &autorun=1 to immediately kick off the extract pipeline) so the user lands
+  // on the web app with the same transcript already loaded.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const incomingText = params.get('text');
+      if (incomingText) {
+        setText(incomingText.slice(0, 12000));
+        setTab('text');
+      }
+      const incomingCreator = params.get('creator');
+      if (incomingCreator) setCreatorName(incomingCreator.slice(0, 120));
+      // Strip the params so refresh doesn't re-fill, but keep the path/hash.
+      if (incomingText || incomingCreator || params.get('source') || params.get('autorun')) {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    } catch {}
+  }, []);
+
   async function openProfile(slug) {
     setRosterError('');
     try {

@@ -491,7 +491,14 @@ function renderReport() {
 
   document.getElementById('openAppBtn').addEventListener('click', () => {
     chrome.storage.sync.get({ frontendUrl: 'https://veritas-ruby.vercel.app' }, ({ frontendUrl }) => {
-      chrome.tabs.create({ url: frontendUrl || 'https://veritas-ruby.vercel.app' });
+      const base = (frontendUrl || 'https://veritas-ruby.vercel.app').replace(/\/$/, '');
+      const params = new URLSearchParams();
+      const handoffText = (transcript || '').trim();
+      if (handoffText) params.set('text', handoffText.slice(0, 12000));
+      if (creatorName) params.set('creator', creatorName.slice(0, 120));
+      params.set('source', 'extension');
+      const query = params.toString();
+      chrome.tabs.create({ url: query ? `${base}/?${query}` : base });
     });
   });
 }
