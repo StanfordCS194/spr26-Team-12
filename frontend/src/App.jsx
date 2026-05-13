@@ -311,9 +311,8 @@ function directionDot(direction) {
   return map[direction] || '·';
 }
 
-function InfluencersView() {
+function InfluencersView({ activeSlug, setActiveSlug }) {
   const [list, setList] = useState(null);
-  const [active, setActive] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -326,8 +325,8 @@ function InfluencersView() {
   if (error) return <div className="panel"><div className="error">{error}</div></div>;
   if (!list) return <div className="panel">Loading influencers…</div>;
 
-  if (active) {
-    return <InfluencerDetail slug={active} onBack={() => setActive(null)} />;
+  if (activeSlug) {
+    return <InfluencerDetail slug={activeSlug} onBack={() => setActiveSlug(null)} />;
   }
 
   return (
@@ -345,7 +344,7 @@ function InfluencersView() {
       </p>
       <div className="influencer-grid">
         {list.map((inf) => (
-          <button key={inf.slug} className="influencer-card" onClick={() => setActive(inf.slug)}>
+          <button key={inf.slug} className="influencer-card" onClick={() => setActiveSlug(inf.slug)}>
             <div className="influencer-head">
               <div
                 className="avatar"
@@ -639,6 +638,7 @@ function ProductDetail({ productId, onBack }) {
 export default function App() {
   const [theme, setTheme] = useTheme();
   const [view, setView] = useState('factcheck'); // 'factcheck' | 'influencers' | 'products'
+  const [activeInfluencerSlug, setActiveInfluencerSlug] = useState(null);
   const [tab, setTab] = useState('text');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -827,14 +827,22 @@ export default function App() {
           <button
             key={v.id}
             className={`topnav-btn ${view === v.id ? 'active' : ''}`}
-            onClick={() => setView(v.id)}
+            onClick={() => {
+              if (v.id === 'influencers') setActiveInfluencerSlug(null);
+              setView(v.id);
+            }}
           >
             {v.label}
           </button>
         ))}
       </nav>
 
-      {view === 'influencers' && <InfluencersView />}
+      {view === 'influencers' && (
+        <InfluencersView
+          activeSlug={activeInfluencerSlug}
+          setActiveSlug={setActiveInfluencerSlug}
+        />
+      )}
       {view === 'products' && <ProductsView />}
 
       {view === 'factcheck' && state === 'idle' && (
@@ -989,8 +997,14 @@ export default function App() {
           <div className="row" style={{ justifyContent: 'center', gap: 12 }}>
             <button className="ghost" onClick={reset}>Check another clip</button>
             {report.creator_name && (
-              <button className="ghost" onClick={() => setView('influencers')}>
-                View influencer leaderboard →
+              <button
+                className="ghost"
+                onClick={() => {
+                  if (report.creator_slug) setActiveInfluencerSlug(report.creator_slug);
+                  setView('influencers');
+                }}
+              >
+                View {report.creator_name}{report.creator_name.endsWith('s') ? "'" : "'s"} credibility profile →
               </button>
             )}
           </div>

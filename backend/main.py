@@ -1,6 +1,7 @@
 """FastAPI entrypoint. Run with: uvicorn backend.main:app --reload"""
 from __future__ import annotations
 
+import re
 import time
 import uuid
 
@@ -177,6 +178,10 @@ async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
         )
     except Exception:
         pass
+    if report.creator_name:
+        report.creator_slug = re.sub(
+            r"[^a-z0-9]+", "-", report.creator_name.strip().lower()
+        ).strip("-")
     return report
 
 

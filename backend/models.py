@@ -155,6 +155,7 @@ class ClipReportResponse(BaseModel):
     transcript: str
     source: SourceMode
     creator_name: Optional[str] = None
+    creator_slug: Optional[str] = None
     brand_name: Optional[str] = None
     claims: List[ClaimCheckResult]
     overall_summary: str
