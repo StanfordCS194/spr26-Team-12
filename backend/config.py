@@ -44,6 +44,16 @@ OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 OPENAI_TEXT_MODEL: str = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini")
 OPENAI_WHISPER_MODEL: str = os.getenv("OPENAI_WHISPER_MODEL", "whisper-1")
 
+# Groq: free-tier-friendly OpenAI-compatible API with Whisper-large-v3 for
+# audio transcription. If GROQ_API_KEY is set, the transcriber will prefer
+# Groq over OpenAI unless TRANSCRIPTION_PROVIDER overrides it.
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3")
+TRANSCRIPTION_PROVIDER: str = os.getenv(
+	"TRANSCRIPTION_PROVIDER",
+	"groq" if os.getenv("GROQ_API_KEY") else "openai",
+).lower()
+
 TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 BRAVE_SEARCH_API_KEY: str = os.getenv("BRAVE_SEARCH_API_KEY", "")
 

@@ -207,6 +207,8 @@ class ProviderStatus(BaseModel):
     search_provider: str
     openai_configured: bool
     search_configured: bool
+    transcription_configured: bool = False
+    groq_configured: bool = False
 
 
 # --- Live scan (lightweight quick-check for Chrome extension) ---

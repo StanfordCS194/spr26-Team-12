@@ -108,6 +108,57 @@ def _dedupe(sources: List[SourceCandidate]) -> List[SourceCandidate]:
     return sorted(unique, key=lambda s: s.quality_score, reverse=True)
 
 
+# Generic words that show up in nearly every fitness/health claim and are
+# therefore useless as a topic-relevance signal. We strip these out before
+# checking whether a candidate source actually covers the claim's topic.
+_GENERIC_CLAIM_TERMS = frozenset({
+    "study", "studies", "research", "researcher", "researchers", "shows",
+    "show", "showed", "found", "evidence", "people", "person", "individual",
+    "individuals", "user", "users", "report", "reports", "reported", "says",
+    "claim", "claims", "claimed", "result", "results", "improve", "improves",
+    "improved", "increase", "increases", "increased", "decrease", "decreases",
+    "decreased", "boost", "boosts", "boosted", "help", "helps", "helped",
+    "make", "makes", "made", "get", "gets", "good", "bad", "better", "best",
+    "worse", "worst", "high", "higher", "highest", "low", "lower", "lowest",
+    "men", "women", "male", "female", "adult", "adults", "year", "years",
+    "day", "days", "week", "weeks", "month", "months", "time", "times",
+    "really", "actually", "true", "false", "fact", "myth", "experts",
+    "expert", "doctor", "doctors", "scientist", "scientists",
+    # Generic exercise vocabulary that's too broad to disambiguate topics.
+    "exercise", "exercises", "workout", "workouts", "training", "trains",
+    "trained", "fitness", "gym", "lift", "lifts", "lifting", "lifted",
+})
+
+
+def _content_terms(text: str) -> List[str]:
+    """Topic-bearing tokens from a claim — content nouns/adjectives only.
+
+    Strips _STOP-style filler words (via retriever._tokens) plus generic
+    fitness/research vocabulary that won't help disambiguate one claim from
+    another (e.g. "study", "muscle", "training"). What's left is the stuff
+    that genuinely defines the claim's topic (e.g. "creatine", "kidney",
+    "fasted", "ashwagandha").
+    """
+    tokens = retriever._tokens(text or "")
+    return [t for t in tokens if t not in _GENERIC_CLAIM_TERMS]
+
+
+def _source_topically_matches(source: SourceCandidate, claim_terms: List[str]) -> bool:
+    """True if the source's title/snippet/URL contains at least one of the
+    claim's content terms. This is the topical-relevance gate that prevents
+    e.g. a creatine-safety review from being attached to a sleep claim.
+
+    Uses word-boundary matching so short tokens like "eat" or "per" don't
+    spuriously match inside longer words like "creatine" or "supplement".
+    """
+    if not claim_terms:
+        # Nothing distinctive to match against — fall back to allowing it.
+        return True
+    haystack = f"{source.title} {source.snippet} {source.url}".lower()
+    haystack_tokens = set(re.findall(r"[a-z0-9\-]+", haystack))
+    return any(term in haystack_tokens for term in claim_terms)
+
+
 def _doc_matches_claim(doc: dict, claim: str) -> bool:
     supplement = str(doc.get("supplement") or "").lower()
     aliases = SOURCE_ALIASES.get(supplement, (supplement,))
@@ -121,7 +172,12 @@ async def search_sources(claim: str, *, limit: int = 5) -> List[SourceCandidate]
     if config.TAVILY_API_KEY:
         sources.extend(await _search_tavily(claim, limit=limit))
     sources.extend(await _search_pubmed(claim, limit=limit))
-    return _dedupe(sources)[:limit]
+
+    # Apply a unified topical-relevance gate across every provider so the
+    # final source list is always specific to the claim's actual subject.
+    claim_terms = _content_terms(claim)
+    relevant = [s for s in sources if _source_topically_matches(s, claim_terms)]
+    return _dedupe(relevant)[:limit]
 
 
 def _search_curated_corpus(claim: str, *, limit: int) -> List[SourceCandidate]:
@@ -216,8 +272,11 @@ async def _search_pubmed(claim: str, *, limit: int) -> List[SourceCandidate]:
         return []
 
     candidates = _parse_pubmed_xml(fetch_response.text)
-    relevant = [source for source in candidates if _source_mentions_claim_context(source, claim)]
-    return relevant or candidates[:1]
+    # Apply the per-claim context heuristic; the unified topical gate in
+    # search_sources() will further drop anything that doesn't mention the
+    # claim's distinctive terms. Drop everything if nothing's relevant —
+    # an off-topic source is worse than no source.
+    return [s for s in candidates if _source_mentions_claim_context(s, claim)]
 
 
 def _source_mentions_claim_context(source: SourceCandidate, claim: str) -> bool:

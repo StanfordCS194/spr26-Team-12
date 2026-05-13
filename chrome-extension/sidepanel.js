@@ -35,6 +35,11 @@ let countdownTimer  = null;
 let secondsLeft     = 0;
 let abortController = null;
 
+// Snapshot of GET /api/health from the most recent poll. Used to gate the
+// Start-recording button when transcription is unavailable (demo mode, no
+// Whisper key). null means we haven't checked yet.
+let healthInfo = null;
+
 // ── DOM ────────────────────────────────────────────────────────────────────
 const app = document.getElementById('app');
 
@@ -117,7 +122,30 @@ function render() {
 
 // ── live_idle ────────────────────────────────────────────────────────────────
 function renderIdle() {
+  // Prefer the explicit transcription_configured flag (set when either Groq
+  // or OpenAI keys exist). Fall back to openai_configured for older backends.
+  const providers = (healthInfo && healthInfo.providers) || {};
+  const transcriptionDown =
+    healthInfo &&
+    (providers.transcription_configured === false ||
+      (providers.transcription_configured === undefined &&
+        providers.openai_configured === false));
+  const demoBanner = transcriptionDown
+    ? `
+      <div class="info-banner" style="border-color:#f59e0b;background:rgba(245,158,11,0.08);">
+        <strong>Audio transcription is unavailable.</strong> Add a free
+        <code>GROQ_API_KEY</code> (or <code>OPENAI_API_KEY</code>) to
+        <code>backend/.env</code> and restart the server. Without it the
+        side panel can't turn captured audio into text — use the popup
+        with pasted text instead.
+        <br><br>
+        <button class="btn-ghost" id="openOptsBtn">Open settings</button>
+      </div>
+    `
+    : '';
+
   app.innerHTML = `
+    ${demoBanner}
     <div class="info-banner">
       <strong>How it works:</strong> Hit "Start recording", then watch the video normally.
       Veritas captures the tab's audio for the chosen window, transcribes it, and
@@ -139,9 +167,13 @@ function renderIdle() {
       placeholder="Creator handle (optional, e.g. @jeffnippard)" />
 
     <div class="btn-row">
-      <button class="btn-rec" id="startBtn">⏺ Start recording</button>
+      <button class="btn-rec" id="startBtn" ${transcriptionDown ? 'disabled' : ''}>
+        ⏺ Start recording${transcriptionDown ? ' (transcription off)' : ''}
+      </button>
     </div>
   `;
+  const optsBtn = document.getElementById('openOptsBtn');
+  if (optsBtn) optsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
   document.querySelectorAll('.dur-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -155,12 +187,12 @@ function renderIdle() {
   });
   if (creatorName) document.getElementById('creatorInput').value = creatorName;
 
-  // START RECORDING — must call tabCapture directly from this click handler.
+  // START RECORDING — must run from this user-gesture click handler.
   document.getElementById('startBtn').addEventListener('click', async () => {
     try {
-      captureStream = await chrome.tabCapture.capture({ audio: true, video: false });
+      captureStream = await acquireTabAudioStream();
     } catch (err) {
-      errorMsg = `Could not capture tab audio: ${err.message || err}. Make sure the tab is playing audio.`;
+      errorMsg = `Could not capture tab audio: ${err.message || err}. Make sure the tab is playing audio on a regular http(s) page (chrome:// pages are blocked).`;
       state = 'error';
       render();
       return;
@@ -175,6 +207,68 @@ function renderIdle() {
 
     startRecording(captureStream);
   });
+}
+
+// chrome.tabCapture.capture() is callback-only (no promise overload), and on
+// recent Chrome versions it sometimes fails when invoked from the side panel
+// context. We try the legacy callback API first, then fall back to the modern
+// MV3 streamId flow: getMediaStreamId() → getUserMedia({ chromeMediaSource }).
+async function acquireTabAudioStream() {
+  let stream = await tryLegacyTabCapture();
+  if (!stream) stream = await tryStreamIdCapture();
+  if (stream) pipePlaybackToSpeakers(stream);
+  return stream;
+}
+
+function tryLegacyTabCapture() {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabCapture.capture({ audio: true, video: false }, (stream) => {
+        if (chrome.runtime.lastError || !stream) {
+          resolve(null);
+        } else {
+          resolve(stream);
+        }
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function tryStreamIdCapture() {
+  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!activeTab || !activeTab.id) {
+    throw new Error('No active tab to capture');
+  }
+  const streamId = await new Promise((resolve, reject) => {
+    chrome.tabCapture.getMediaStreamId({ targetTabId: activeTab.id }, (id) => {
+      if (chrome.runtime.lastError || !id) {
+        reject(new Error(chrome.runtime.lastError?.message || 'No stream id'));
+      } else {
+        resolve(id);
+      }
+    });
+  });
+  return await navigator.mediaDevices.getUserMedia({
+    audio: {
+      mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId },
+    },
+    video: false,
+  });
+}
+
+// Both tabCapture paths in current Chrome route audio AWAY from the speakers
+// while we record (the user hears silence). Wire the captured stream into an
+// AudioContext destination so playback continues uninterrupted. We keep the
+// context on the stream so it isn't garbage-collected mid-recording.
+let _playbackCtx = null;
+function pipePlaybackToSpeakers(stream) {
+  try {
+    if (_playbackCtx) { try { _playbackCtx.close(); } catch {} }
+    _playbackCtx = new AudioContext();
+    _playbackCtx.createMediaStreamSource(stream).connect(_playbackCtx.destination);
+  } catch {}
 }
 
 // ── recording ────────────────────────────────────────────────────────────────
@@ -289,6 +383,10 @@ function stopRecordingAndProcess() {
 
 function stopStreamTracks(stream) {
   if (stream) stream.getTracks().forEach(t => t.stop());
+  if (_playbackCtx) {
+    try { _playbackCtx.close(); } catch {}
+    _playbackCtx = null;
+  }
 }
 
 // ── Audio processing pipeline ─────────────────────────────────────────────
@@ -329,7 +427,15 @@ async function processAudio(blob, mimeType) {
     state = 'review';
   } catch (err) {
     if (err.name === 'AbortError') { state = 'live_idle'; render(); return; }
-    errorMsg = err.message || String(err);
+    const raw = err.message || String(err);
+    if (/GROQ_API_KEY|OPENAI_API_KEY|transcription requires/i.test(raw)) {
+      errorMsg =
+        'Audio transcription is not configured on the backend. Add a free ' +
+        'GROQ_API_KEY (or OPENAI_API_KEY) to backend/.env and restart the server, ' +
+        'or use the popup with pasted text instead.';
+    } else {
+      errorMsg = raw;
+    }
     state = 'error';
   }
   render();
@@ -518,4 +624,19 @@ function renderError() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const base = await getBase();
+    const res = await fetch(`${base}/api/health`);
+    if (res.ok) {
+      healthInfo = await res.json();
+      if (state === 'live_idle') render();
+    }
+  } catch {
+    // Backend unreachable — leave healthInfo as is; user still sees the
+    // generic info banner. The capture call will surface its own error.
+  }
+}
+
 render();
+checkHealth();
