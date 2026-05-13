@@ -11,6 +11,21 @@ function detectPlatform(url) {
   return null;
 }
 
+/** Vercel/Render often return HTML or plain text on 5xx; avoid response.json() on errors. */
+async function readApiError(response) {
+  const text = await response.text();
+  try {
+    const j = JSON.parse(text);
+    if (j && typeof j === 'object' && j.detail != null) return String(j.detail);
+    if (j && typeof j === 'object' && j.message != null) return String(j.message);
+  } catch {
+    /* not JSON */
+  }
+  const trimmed = text.trim();
+  if (trimmed) return trimmed.slice(0, 400);
+  return `Request failed (HTTP ${response.status})`;
+}
+
 function useTheme() {
   const [theme, setTheme] = useState(
     () => document.documentElement.dataset.theme || 'light'
@@ -832,7 +847,7 @@ export default function App() {
     setRosterError('');
     try {
       const response = await fetch(`/api/influencers?min_verified=${rosterMin}`);
-      if (!response.ok) throw new Error((await response.json()).detail || 'Failed to load leaderboard');
+      if (!response.ok) throw new Error(await readApiError(response));
       setRoster(await response.json());
     } catch (err) {
       setRosterError(err.message || String(err));
@@ -871,7 +886,7 @@ export default function App() {
     setRosterError('');
     try {
       const response = await fetch(`/api/influencers/${slug}`);
-      if (!response.ok) throw new Error((await response.json()).detail || 'Failed to load profile');
+      if (!response.ok) throw new Error(await readApiError(response));
       setActiveProfile(await response.json());
       setView('roster-detail');
     } catch (err) {
@@ -894,7 +909,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/influencers/${activeProfile.slug}`, { method: 'DELETE' });
       if (!response.ok && response.status !== 204) {
-        throw new Error((await response.json()).detail || 'Delete failed');
+        throw new Error(await readApiError(response));
       }
       setActiveProfile(null);
       setView('roster');
@@ -926,7 +941,7 @@ export default function App() {
         body: JSON.stringify({ text }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Text processing failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     if (tab === 'link') {
@@ -936,7 +951,7 @@ export default function App() {
         body: JSON.stringify({ url }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Link processing failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     if (tab === 'screenshot') {
@@ -948,7 +963,7 @@ export default function App() {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Screenshot processing failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     if (tab === 'audio') {
@@ -960,7 +975,7 @@ export default function App() {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Audio transcription failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     throw new Error('Unknown input type.');
@@ -979,7 +994,7 @@ export default function App() {
         body: JSON.stringify({ transcript: processed, source: tab }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Claim extraction failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       const payload = await response.json();
       setClaims(payload.claims || []);
       setState('review');
@@ -1007,7 +1022,7 @@ export default function App() {
         }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Report generation failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       setReport(await response.json());
       setState('report');
     } catch (err) {
@@ -1076,68 +1091,11 @@ export default function App() {
             ))}
           </div>
 
-          <div className="profile-row">
-            <input
-              type="text"
-              placeholder="Influencer handle (optional)"
-              value={creatorName}
-              onChange={(e) => setCreatorName(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Brand name (optional)"
-              value={brandName}
-              onChange={(e) => setBrandName(e.target.value)}
-            />
-          </div>
-
-          {tab === 'text' && (
-            <>
-              <textarea
-                placeholder="Paste a transcript, caption, or influencer rant..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={12000}
-              />
-              <div className="row">
-                <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
-                <span className="pill">{text.length}/12000</span>
-              </div>
-            </>
-          )}
-
-          {tab === 'audio' && (
-            <>
-              <label
-                className={`dropzone ${drag ? 'drag' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-                onDragLeave={() => setDrag(false)}
-                onDrop={(e) => {
-                  e.preventDefault(); setDrag(false);
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) setAudioFile(file);
-                }}
-              >
-                <input
-                  type="file"
-                  accept="audio/*,video/mp4,video/quicktime,video/webm"
-                  style={{ display: 'none' }}
-                  onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-                />
-                {audioFile ? <span>{audioFile.name} - click to replace</span> : <span>Drop an audio/video clip or click to choose one</span>}
-              </label>
-              <div className="row">
-                <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Transcribe and extract claims</button>
-                <span className="pill">Audio transcription</span>
-              </div>
-            </>
-          )}
-
-          {tab === 'link' && (
+          {tab === 'link' ? (
             <>
               <input
                 type="url"
-                placeholder="https://www.tiktok.com/..."
+                placeholder="Paste video or article URL (YouTube, TikTok, …)"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
@@ -1145,32 +1103,105 @@ export default function App() {
                 <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
                 {platform && <span className="pill">platform: {platform}</span>}
               </div>
-            </>
-          )}
-
-          {tab === 'screenshot' && (
-            <>
-              <label
-                className={`dropzone ${drag ? 'drag' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-                onDragLeave={() => setDrag(false)}
-                onDrop={(e) => {
-                  e.preventDefault(); setDrag(false);
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) setImageFile(file);
-                }}
-              >
+              <div className="profile-row">
                 <input
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  type="text"
+                  placeholder="@handle (optional, not the URL above)"
+                  value={creatorName}
+                  onChange={(e) => setCreatorName(e.target.value)}
                 />
-                {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
-              </label>
-              <div className="row">
-                <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
+                <input
+                  type="text"
+                  placeholder="Brand name (optional)"
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                />
               </div>
+            </>
+          ) : (
+            <>
+              <div className="profile-row">
+                <input
+                  type="text"
+                  placeholder="Influencer handle (optional)"
+                  value={creatorName}
+                  onChange={(e) => setCreatorName(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Brand name (optional)"
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                />
+              </div>
+
+              {tab === 'text' && (
+                <>
+                  <textarea
+                    placeholder="Paste a transcript, caption, or influencer rant..."
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    maxLength={12000}
+                  />
+                  <div className="row">
+                    <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
+                    <span className="pill">{text.length}/12000</span>
+                  </div>
+                </>
+              )}
+
+              {tab === 'audio' && (
+                <>
+                  <label
+                    className={`dropzone ${drag ? 'drag' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                    onDragLeave={() => setDrag(false)}
+                    onDrop={(e) => {
+                      e.preventDefault(); setDrag(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) setAudioFile(file);
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept="audio/*,video/mp4,video/quicktime,video/webm"
+                      style={{ display: 'none' }}
+                      onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                    />
+                    {audioFile ? <span>{audioFile.name} - click to replace</span> : <span>Drop an audio/video clip or click to choose one</span>}
+                  </label>
+                  <div className="row">
+                    <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Transcribe and extract claims</button>
+                    <span className="pill">Audio transcription</span>
+                  </div>
+                </>
+              )}
+
+              {tab === 'screenshot' && (
+                <>
+                  <label
+                    className={`dropzone ${drag ? 'drag' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                    onDragLeave={() => setDrag(false)}
+                    onDrop={(e) => {
+                      e.preventDefault(); setDrag(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) setImageFile(file);
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                    />
+                    {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
+                  </label>
+                  <div className="row">
+                    <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

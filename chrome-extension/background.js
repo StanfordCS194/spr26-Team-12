@@ -2,6 +2,8 @@
 // opens the Live Fact-Check side panel, and coordinates live scanning with
 // the backend API (caching + rate limiting).
 
+importScripts('defaults.js');
+
 // ── Context menu setup ────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -57,8 +59,8 @@ let processingQueue = false;
 
 async function getBackendUrl() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get({ backendUrl: 'http://localhost:8000' }, ({ backendUrl }) => {
-      resolve((backendUrl || 'http://localhost:8000').replace(/\/$/, ''));
+    chrome.storage.sync.get({ backendUrl: VERITAS_DEFAULT_BACKEND }, ({ backendUrl }) => {
+      resolve((backendUrl || VERITAS_DEFAULT_BACKEND).replace(/\/$/, ''));
     });
   });
 }
