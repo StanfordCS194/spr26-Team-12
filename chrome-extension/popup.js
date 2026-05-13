@@ -548,8 +548,8 @@ function renderReport() {
   });
 
   document.getElementById('openAppBtn').addEventListener('click', () => {
-    chrome.storage.sync.get({ frontendUrl: 'http://localhost:5173' }, ({ frontendUrl }) => {
-      chrome.tabs.create({ url: frontendUrl || 'http://localhost:5173' });
+    chrome.storage.sync.get({ frontendUrl: 'https://veritas-ruby.vercel.app' }, ({ frontendUrl }) => {
+      chrome.tabs.create({ url: frontendUrl || 'https://veritas-ruby.vercel.app' });
     });
   });
 }
