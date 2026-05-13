@@ -155,12 +155,12 @@ function renderIdle() {
   });
   if (creatorName) document.getElementById('creatorInput').value = creatorName;
 
-  // START RECORDING — must call tabCapture directly from this click handler.
+  // START RECORDING — must run from this user-gesture click handler.
   document.getElementById('startBtn').addEventListener('click', async () => {
     try {
-      captureStream = await chrome.tabCapture.capture({ audio: true, video: false });
+      captureStream = await acquireTabAudioStream();
     } catch (err) {
-      errorMsg = `Could not capture tab audio: ${err.message || err}. Make sure the tab is playing audio.`;
+      errorMsg = `Could not capture tab audio: ${err.message || err}. Make sure the tab is playing audio on a regular http(s) page (chrome:// pages are blocked).`;
       state = 'error';
       render();
       return;
@@ -175,6 +175,61 @@ function renderIdle() {
 
     startRecording(captureStream);
   });
+}
+
+// chrome.tabCapture.capture() is callback-only (no promise overload), and on
+// recent Chrome versions it sometimes fails when invoked from the side panel
+// context. We try the legacy callback API first, then fall back to the modern
+// MV3 streamId flow: getMediaStreamId() → getUserMedia({ chromeMediaSource }).
+async function acquireTabAudioStream() {
+  const legacy = await tryLegacyTabCapture();
+  if (legacy) return legacy;
+  return await tryStreamIdCapture();
+}
+
+function tryLegacyTabCapture() {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabCapture.capture({ audio: true, video: false }, (stream) => {
+        if (chrome.runtime.lastError || !stream) {
+          resolve(null);
+        } else {
+          resolve(stream);
+        }
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function tryStreamIdCapture() {
+  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!activeTab || !activeTab.id) {
+    throw new Error('No active tab to capture');
+  }
+  const streamId = await new Promise((resolve, reject) => {
+    chrome.tabCapture.getMediaStreamId({ targetTabId: activeTab.id }, (id) => {
+      if (chrome.runtime.lastError || !id) {
+        reject(new Error(chrome.runtime.lastError?.message || 'No stream id'));
+      } else {
+        resolve(id);
+      }
+    });
+  });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId },
+    },
+    video: false,
+  });
+  // The streamId path silences tab playback by default; pipe audio back to
+  // the user's speakers so they can still hear the video while we record.
+  try {
+    const ctx = new AudioContext();
+    ctx.createMediaStreamSource(stream).connect(ctx.destination);
+  } catch {}
+  return stream;
 }
 
 // ── recording ────────────────────────────────────────────────────────────────
