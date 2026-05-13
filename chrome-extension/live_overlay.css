@@ -1,0 +1,226 @@
+/* Veritas Live Overlay — floats on the video player */
+
+.veritas-live-overlay {
+  --v-bg: #ffffff;
+  --v-surface: #f5f5f7;
+  --v-border: #e5e5ea;
+  --v-text: #1d1d1f;
+  --v-secondary: #86868b;
+  --v-accent: #0071e3;
+  --v-accent-hover: #0077ed;
+  --v-red: #ff3b30;
+  --v-orange: #ff9500;
+  --v-blue: #007aff;
+
+  position: absolute;
+  bottom: 60px;
+  right: 12px;
+  width: 340px;
+  max-height: 70vh;
+  overflow-y: auto;
+
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v-text);
+  background: var(--v-bg);
+  border: 1px solid var(--v-border);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  z-index: 2147483647;
+  pointer-events: auto;
+}
+
+/* Header bar */
+.veritas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.veritas-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.veritas-logo {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--v-text);
+}
+
+.veritas-claim-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--v-secondary);
+}
+
+/* Close button */
+.veritas-close-btn {
+  font-size: 18px;
+  color: var(--v-secondary);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  border: none;
+  background: none;
+}
+.veritas-close-btn:hover {
+  color: var(--v-text);
+}
+
+/* Severity indicator line */
+.veritas-severity-bar {
+  height: 2px;
+  margin: 0 16px;
+  border-radius: 1px;
+}
+.veritas-severity-high .veritas-severity-bar { background: var(--v-red); }
+.veritas-severity-medium .veritas-severity-bar { background: var(--v-orange); }
+.veritas-severity-low .veritas-severity-bar { background: var(--v-blue); }
+
+/* Claims list */
+.veritas-claims-list {
+  padding: 8px 16px 12px;
+}
+
+/* Individual claim card */
+.veritas-claim {
+  padding: 10px 12px;
+  margin: 6px 0;
+  border-radius: 10px;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
+}
+
+.veritas-claim-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.veritas-risk-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.veritas-claim-high .veritas-risk-dot { background: var(--v-red); }
+.veritas-claim-medium .veritas-risk-dot { background: var(--v-orange); }
+.veritas-claim-low .veritas-risk-dot { background: var(--v-blue); }
+
+.veritas-claim-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--v-text);
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.veritas-verdict {
+  margin: 6px 0 4px 15px;
+  font-size: 11.5px;
+  color: var(--v-secondary);
+  line-height: 1.45;
+}
+
+.veritas-claim-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  margin-left: 15px;
+}
+
+.veritas-category,
+.veritas-risk {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--v-surface);
+  color: var(--v-secondary);
+  border: 1px solid var(--v-border);
+  letter-spacing: 0.01em;
+}
+
+.veritas-claim-high .veritas-risk {
+  background: rgba(255, 59, 48, 0.08);
+  color: var(--v-red);
+  border-color: rgba(255, 59, 48, 0.2);
+}
+.veritas-claim-medium .veritas-risk {
+  background: rgba(255, 149, 0, 0.08);
+  color: var(--v-orange);
+  border-color: rgba(255, 149, 0, 0.2);
+}
+
+/* Deep check button */
+.veritas-deep-check-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: var(--v-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+.veritas-deep-check-btn:hover {
+  background: var(--v-accent-hover);
+}
+
+/* No footer — logo is in the header */
+
+/* Timestamp badge (click-to-seek) */
+.veritas-timestamp {
+  display: inline-block;
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--v-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 3px;
+  transition: background 0.15s;
+  user-select: none;
+  line-height: 1.5;
+  border: 1px solid rgba(0, 122, 255, 0.15);
+}
+.veritas-timestamp:hover {
+  background: rgba(0, 122, 255, 0.18);
+}
+
+/* Progress bar markers */
+.veritas-progress-marker {
+  transition: opacity 0.15s;
+}
+.veritas-progress-marker:hover {
+  opacity: 1 !important;
+  transform: scaleX(1.5);
+}
+
+/* Scrollbar styling */
+.veritas-live-overlay::-webkit-scrollbar {
+  width: 4px;
+}
+.veritas-live-overlay::-webkit-scrollbar-thumb {
+  background: var(--v-border);
+  border-radius: 4px;
+}
