@@ -431,7 +431,7 @@ def _sources_from_cache(cached: dict) -> List[SourceCandidate]:
     return sources
 
 
-def _check_from_demo_cache(claim: ExtractedClaimItem) -> ClaimCheckResult | None:
+async def _check_from_demo_cache(claim: ExtractedClaimItem) -> ClaimCheckResult | None:
     """Return a fully-formed ClaimCheckResult if the claim matches a hand-curated
     demo-cache entry, else None. Bypasses LLM verifiers entirely so showcase
     claims produce real, directional verdicts when no API key is set."""
@@ -458,7 +458,7 @@ def _check_from_demo_cache(claim: ExtractedClaimItem) -> ClaimCheckResult | None
         status="ok",
         sources=sources,
         agreement=agreement,
-        recommendations=product_recommender.recommend_for_claim(claim),
+        recommendations=await product_recommender.recommend_for_claim(claim),
     )
 
 
@@ -755,7 +755,7 @@ async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
     #    caffeine, ashwagandha, tongkat ali, protein dosing, etc. produce real
     #    directional verdicts even without any API keys configured.
     if config.DEMO_MODE:
-        cached_result = _check_from_demo_cache(claim)
+        cached_result = await _check_from_demo_cache(claim)
         if cached_result is not None:
             return cached_result
 
@@ -778,7 +778,7 @@ async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
             status=status,  # type: ignore[arg-type]
             sources=sources,
             agreement=agreement,
-            recommendations=product_recommender.recommend_for_claim(claim),
+            recommendations=await product_recommender.recommend_for_claim(claim),
         )
 
     # 3) Live path — two independent LLM verifiers + agreement judge.
