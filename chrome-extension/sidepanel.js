@@ -122,17 +122,22 @@ function render() {
 
 // ── live_idle ────────────────────────────────────────────────────────────────
 function renderIdle() {
+  // Prefer the explicit transcription_configured flag (set when either Groq
+  // or OpenAI keys exist). Fall back to openai_configured for older backends.
+  const providers = (healthInfo && healthInfo.providers) || {};
   const transcriptionDown =
     healthInfo &&
-    healthInfo.providers &&
-    healthInfo.providers.openai_configured === false;
+    (providers.transcription_configured === false ||
+      (providers.transcription_configured === undefined &&
+        providers.openai_configured === false));
   const demoBanner = transcriptionDown
     ? `
       <div class="info-banner" style="border-color:#f59e0b;background:rgba(245,158,11,0.08);">
-        <strong>Audio transcription is unavailable.</strong> Your backend is running
-        in demo mode (no <code>OPENAI_API_KEY</code>), so the side panel can't turn
-        captured audio into text. Add a key in your backend <code>.env</code> and
-        restart, or use the popup with pasted text instead.
+        <strong>Audio transcription is unavailable.</strong> Add a free
+        <code>GROQ_API_KEY</code> (or <code>OPENAI_API_KEY</code>) to
+        <code>backend/.env</code> and restart the server. Without it the
+        side panel can't turn captured audio into text — use the popup
+        with pasted text instead.
         <br><br>
         <button class="btn-ghost" id="openOptsBtn">Open settings</button>
       </div>
@@ -423,11 +428,11 @@ async function processAudio(blob, mimeType) {
   } catch (err) {
     if (err.name === 'AbortError') { state = 'live_idle'; render(); return; }
     const raw = err.message || String(err);
-    if (/OPENAI_API_KEY/i.test(raw)) {
+    if (/GROQ_API_KEY|OPENAI_API_KEY|transcription requires/i.test(raw)) {
       errorMsg =
-        'Audio transcription requires an OpenAI API key on the backend. ' +
-        'Your server is running in demo mode. Add OPENAI_API_KEY to backend/.env ' +
-        'and restart the server, or use the popup with pasted text instead.';
+        'Audio transcription is not configured on the backend. Add a free ' +
+        'GROQ_API_KEY (or OPENAI_API_KEY) to backend/.env and restart the server, ' +
+        'or use the popup with pasted text instead.';
     } else {
       errorMsg = raw;
     }

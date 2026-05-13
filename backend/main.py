@@ -41,16 +41,19 @@ app.include_router(influencers_router)
 
 @app.get("/api/health")
 def health() -> dict:
+    transcription_configured = bool(config.OPENAI_API_KEY or config.GROQ_API_KEY)
     return {
         "ok": True,
         "demo_mode": config.DEMO_MODE,
         "providers": ProviderStatus(
             primary_llm_provider=config.PRIMARY_LLM_PROVIDER,
             secondary_llm_provider=config.SECONDARY_LLM_PROVIDER,
-            transcription_provider="openai",
+            transcription_provider=config.TRANSCRIPTION_PROVIDER,
             search_provider=config.SEARCH_PROVIDER,
             openai_configured=bool(config.OPENAI_API_KEY),
             search_configured=bool(config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY),
+            transcription_configured=transcription_configured,
+            groq_configured=bool(config.GROQ_API_KEY),
         ).model_dump(),
     }
 
