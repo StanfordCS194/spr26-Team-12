@@ -11,8 +11,8 @@ class TranscriptionUnavailable(RuntimeError):
 
 
 async def transcribe_audio(filename: str, content_type: str, data: bytes) -> str:
-    if not config.GROQ_API_KEY:
-        raise TranscriptionUnavailable("GROQ_API_KEY is required for audio transcription.")
+    if not config.OPENAI_API_KEY:
+        raise TranscriptionUnavailable("OPENAI_API_KEY is required for audio transcription.")
     if not data:
         raise ValueError("Empty audio file.")
     max_bytes = config.MAX_AUDIO_MB * 1024 * 1024
@@ -23,15 +23,15 @@ async def transcribe_audio(filename: str, content_type: str, data: bytes) -> str
         "file": (filename or "audio.mp3", data, content_type or "application/octet-stream"),
     }
     form = {
-        "model": config.GROQ_TRANSCRIPTION_MODEL,
+        "model": config.OPENAI_WHISPER_MODEL,
         "response_format": "json",
         "temperature": "0",
     }
-    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}"}
+    headers = {"Authorization": f"Bearer {config.OPENAI_API_KEY}"}
     try:
         async with httpx.AsyncClient(timeout=config.TRANSCRIPTION_TIMEOUT_SECONDS) as client:
             response = await client.post(
-                "https://api.groq.com/openai/v1/audio/transcriptions",
+                "https://api.openai.com/v1/audio/transcriptions",
                 headers=headers,
                 data=form,
                 files=files,
@@ -40,10 +40,10 @@ async def transcribe_audio(filename: str, content_type: str, data: bytes) -> str
             payload = response.json()
             transcript = str(payload.get("text", "")).strip()
             if not transcript:
-                raise TranscriptionUnavailable("Groq returned an empty transcript.")
+                raise TranscriptionUnavailable("OpenAI Whisper returned an empty transcript.")
             return transcript
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text[:300]
-        raise TranscriptionUnavailable(f"Groq transcription failed: {detail}") from exc
+        raise TranscriptionUnavailable(f"Transcription failed: {detail}") from exc
     except httpx.HTTPError as exc:
-        raise TranscriptionUnavailable(f"Groq transcription request failed: {exc}") from exc
+        raise TranscriptionUnavailable(f"Transcription request failed: {exc}") from exc

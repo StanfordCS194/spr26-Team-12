@@ -35,7 +35,7 @@ async def process_url(url: str) -> Tuple[str, str]:
     """Return (text, platform).
 
     - article: scrape via trafilatura.
-    - youtube/tiktok/reddit: download audio with yt-dlp, transcribe via Groq Whisper.
+    - youtube/tiktok/reddit: download audio with yt-dlp, transcribe via OpenAI Whisper.
     Falls back to a stub string only if every path fails so the UI still progresses.
     """
     if not _URL_RE.match(url or ""):

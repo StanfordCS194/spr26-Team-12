@@ -206,5 +206,30 @@ class ProviderStatus(BaseModel):
     transcription_provider: str
     search_provider: str
     openai_configured: bool
-    groq_configured: bool
     search_configured: bool
+
+
+# --- Live scan (lightweight quick-check for Chrome extension) ---
+class QuickScanRequest(BaseModel):
+    text: str = Field(..., max_length=5000)
+    url: Optional[str] = None
+    platform: Optional[str] = None
+    content_type: Optional[str] = None
+
+
+class QuickScanClaim(BaseModel):
+    claim_id: str
+    text: str
+    category: ClaimCategory = "other"
+    risk_level: RiskLevel = "low"
+    confidence: Confidence = "medium"
+    brief_verdict: str = ""
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    timestamp_label: Optional[str] = None
+
+
+class QuickScanResponse(BaseModel):
+    claims: List[QuickScanClaim]
+    scan_time_ms: int
+    flagged: bool = False

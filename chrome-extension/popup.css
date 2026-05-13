@@ -107,6 +107,25 @@ header {
 .status-pill-offline { color: var(--red); }
 @keyframes pulse { 50% { opacity: 0.4; } }
 
+/* ——— Live scanning toggle indicator (header) ——— */
+.live-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gray);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.live-dot-active {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse-live 2s infinite;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* ——— Main content area ——— */
 main { padding: 14px; }
 

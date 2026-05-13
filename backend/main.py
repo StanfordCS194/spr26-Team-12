@@ -18,10 +18,12 @@ from .models import (
     ExtractResponse,
     ProcessResponse,
     ProviderStatus,
+    QuickScanRequest,
+    QuickScanResponse,
     Verdict,
     VerdictRequest,
 )
-from .pipeline import clip_checker, extractor, transcriber, verdict as verdict_pipeline
+from .pipeline import clip_checker, extractor, quick_scan, transcriber, verdict as verdict_pipeline
 from .pipeline import credibility
 
 app = FastAPI(title="Veritas", version="0.2.0")
@@ -45,10 +47,9 @@ def health() -> dict:
         "providers": ProviderStatus(
             primary_llm_provider=config.PRIMARY_LLM_PROVIDER,
             secondary_llm_provider=config.SECONDARY_LLM_PROVIDER,
-            transcription_provider="groq",
+            transcription_provider="openai",
             search_provider=config.SEARCH_PROVIDER,
             openai_configured=bool(config.OPENAI_API_KEY),
-            groq_configured=bool(config.GROQ_API_KEY),
             search_configured=bool(config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY),
         ).model_dump(),
     }
@@ -124,6 +125,18 @@ async def extract_claims(req: ExtractClaimsRequest) -> ExtractClaimsResponse:
         request_id=uuid.uuid4().hex,
         extraction_time_ms=int((time.perf_counter() - t0) * 1000),
     )
+
+
+@app.post("/api/claims/quick-scan", response_model=QuickScanResponse)
+async def quick_scan_endpoint(req: QuickScanRequest) -> QuickScanResponse:
+    """Lightweight claim detection for the live Chrome extension overlay.
+    Returns flagged claims with risk levels but skips full dual-verifier pipeline."""
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="text required")
+    t0 = time.perf_counter()
+    result = await quick_scan.scan(req.text, url=req.url, platform=req.platform, content_type=req.content_type)
+    result.scan_time_ms = int((time.perf_counter() - t0) * 1000)
+    return result
 
 
 @app.post("/api/verdict", response_model=Verdict)

@@ -1,18 +1,27 @@
 // options.js — load and save Veritas extension settings
 
-const backendInput  = document.getElementById('backendUrl');
-const frontendInput = document.getElementById('frontendUrl');
-const saveBtn       = document.getElementById('saveBtn');
-const testBtn       = document.getElementById('testBtn');
-const saveStatus    = document.getElementById('saveStatus');
-const testStatus    = document.getElementById('testStatus');
+const backendInput   = document.getElementById('backendUrl');
+const frontendInput  = document.getElementById('frontendUrl');
+const liveScanToggle = document.getElementById('liveScanToggle');
+const saveBtn        = document.getElementById('saveBtn');
+const testBtn        = document.getElementById('testBtn');
+const saveStatus     = document.getElementById('saveStatus');
+const testStatus     = document.getElementById('testStatus');
+const clearCacheBtn  = document.getElementById('clearCacheBtn');
+const cacheStatus    = document.getElementById('cacheStatus');
+const scanStats      = document.getElementById('scanStats');
 
 // Load saved values
 chrome.storage.sync.get(
-  { backendUrl: 'http://localhost:8000', frontendUrl: 'https://veritas-ruby.vercel.app' },
-  ({ backendUrl, frontendUrl }) => {
+  {
+    backendUrl: 'http://localhost:8000',
+    frontendUrl: 'https://veritas-ruby.vercel.app',
+    liveScanEnabled: true,
+  },
+  ({ backendUrl, frontendUrl, liveScanEnabled }) => {
     backendInput.value  = backendUrl;
     frontendInput.value = frontendUrl;
+    liveScanToggle.checked = liveScanEnabled;
   }
 );
 
@@ -20,10 +29,16 @@ chrome.storage.sync.get(
 saveBtn.addEventListener('click', () => {
   const backendUrl  = backendInput.value.trim()  || 'http://localhost:8000';
   const frontendUrl = frontendInput.value.trim() || 'https://veritas-ruby.vercel.app';
-  chrome.storage.sync.set({ backendUrl, frontendUrl }, () => {
+  const liveScanEnabled = liveScanToggle.checked;
+  chrome.storage.sync.set({ backendUrl, frontendUrl, liveScanEnabled }, () => {
     saveStatus.textContent = 'Saved!';
     setTimeout(() => { saveStatus.textContent = ''; }, 2000);
   });
+});
+
+// Live scan toggle (instant save)
+liveScanToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ liveScanEnabled: liveScanToggle.checked });
 });
 
 // Test connection
@@ -49,4 +64,25 @@ testBtn.addEventListener('click', async () => {
     testStatus.textContent = '';
     testStatus.style.color = '';
   }, 5000);
+});
+
+// Clear scan cache
+clearCacheBtn.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ type: 'CLEAR_SCAN_CACHE' }, (response) => {
+    if (response && response.ok) {
+      cacheStatus.textContent = 'Cache cleared';
+      cacheStatus.style.color = 'var(--green, #4ade80)';
+    }
+    setTimeout(() => {
+      cacheStatus.textContent = '';
+      cacheStatus.style.color = '';
+    }, 2000);
+  });
+});
+
+// Show scan stats
+chrome.runtime.sendMessage({ type: 'GET_SCAN_STATS' }, (response) => {
+  if (response) {
+    scanStats.textContent = `Cache: ${response.cacheSize} entries | Queue: ${response.queueLength} pending`;
+  }
 });
