@@ -990,7 +990,7 @@ export default function App() {
             <button className="ghost" onClick={reset}>Check another clip</button>
             {report.creator_name && (
               <button className="ghost" onClick={() => setView('influencers')}>
-                View {report.creator_name}'s credibility →
+                View influencer leaderboard →
               </button>
             )}
           </div>
