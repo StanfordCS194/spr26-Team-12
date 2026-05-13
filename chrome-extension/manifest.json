@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Veritas — Fitness Bro Fact Checker",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Live fact-check warnings for fitness claims on YouTube, Twitter/X, and TikTok. Highlight any health claim and verify it instantly.",
   "permissions": [
     "storage",
@@ -12,6 +12,8 @@
   ],
   "host_permissions": [
     "http://localhost/*",
+    "https://veritas-api-ka3y.onrender.com/*",
+    "https://veritas-api.onrender.com/*",
     "https://veritas-ruby.vercel.app/*",
     "https://*.youtube.com/*",
     "https://*.twitter.com/*",

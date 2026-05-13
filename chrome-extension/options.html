@@ -97,10 +97,10 @@
   <section>
     <h2>Backend connection</h2>
     <label for="backendUrl">Veritas backend URL</label>
-    <input type="url" id="backendUrl" placeholder="http://localhost:8000" />
+    <input type="url" id="backendUrl" placeholder="https://veritas-api-ka3y.onrender.com" />
     <p class="hint">
-      Default: <code>http://localhost:8000</code> (local development).
-      Update this if you deploy the FastAPI backend to a public server.
+      Default: same API as the website (<code>https://veritas-api-ka3y.onrender.com</code> — see
+      <code>frontend/vercel.json</code>). Use <code>http://localhost:8000</code> for local backend only.
     </p>
     <div class="test-row">
       <button id="saveBtn">Save</button>
@@ -115,8 +115,10 @@
     <label for="frontendUrl">Veritas frontend URL</label>
     <input type="url" id="frontendUrl" placeholder="https://veritas-ruby.vercel.app" />
     <p class="hint">
-      Default: <code>https://veritas-ruby.vercel.app</code> (deployed).
+      Default: production <code>https://veritas-ruby.vercel.app</code>.
       Use <code>http://localhost:5173</code> when running the Vite dev server.
+      If the backend exposes <code>web_app_url</code> on <code>/api/health</code>,
+      <strong>Test connection</strong> can fill this when the field is still localhost.
     </p>
   </section>
 
@@ -141,6 +143,7 @@
     </div>
   </section>
 
+  <script src="defaults.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
