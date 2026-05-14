@@ -23,24 +23,44 @@
   // ── State ───────────────────────────────────────────────────────────────────
   const scannedTexts = new Set();
   const scannedElements = new WeakSet();
+  const scannedElementLengths = new WeakMap();
   let scanEnabled = true;
   let scanDebounce = null;
   let collectedClaims = [];
   let urlCheckInterval = null;
   let contextValid = true;
+  let transcriptScanActive = false; // prevents concurrent transcript scans
   const DEBOUNCE_MS = 1500;
   const MIN_TEXT_LENGTH = 40;
 
-  // Fitness keywords for client-side pre-filter (avoids unnecessary API calls)
+  // Health & fitness keywords for client-side pre-filter.
+  // Broad enough to catch general health claims (not just gym/supplement content).
   const FITNESS_KEYWORDS = [
-    'creatine', 'bcaa', 'protein', 'supplement', 'testosterone', 'fat burn',
-    'weight loss', 'muscle', 'workout', 'pre-workout', 'collagen', 'tongkat',
-    'ashwagandha', 'metabolism', 'cortisol', 'hormone', 'gains', 'bulking',
-    'cutting', 'macros', 'calories', 'whey', 'casein', 'amino',
-    'hypertrophy', 'anabolic', 'recovery', 'detox', 'cleanse', 'superfood',
-    'keto', 'intermittent fasting', 'insulin', 'electrolytes', 'hiit',
-    'fat burner', 'shred', 'lean', 'toned', 'boost testosterone',
-    'natural testosterone', 'gut health', 'inflammation', 'joint',
+    // Supplements & ingredients
+    'creatine', 'bcaa', 'protein', 'supplement', 'collagen', 'tongkat',
+    'ashwagandha', 'whey', 'casein', 'amino', 'pre-workout', 'probiotic',
+    'vitamin', 'magnesium', 'zinc', 'omega-3', 'fish oil', 'shilajit',
+    'melatonin', 'electrolytes', 'antioxidant', 'superfood',
+    // Hormones & biology
+    'testosterone', 'estrogen', 'cortisol', 'hormone', 'insulin',
+    'metabolism', 'anabolic', 'endocrine', 'thyroid', 'serotonin',
+    'dopamine', 'adrenaline', 'growth hormone',
+    // Fitness & training
+    'muscle', 'workout', 'hypertrophy', 'gains', 'bulking', 'cutting',
+    'fat burn', 'fat burner', 'weight loss', 'cardio', 'hiit',
+    'shred', 'lean', 'toned', 'recovery', 'overtraining',
+    // Nutrition & diet
+    'macros', 'calories', 'keto', 'intermittent fasting', 'carbs',
+    'glycemic', 'cholesterol', 'saturated fat', 'sugar', 'fiber',
+    'gut health', 'microbiome', 'detox', 'cleanse', 'diet',
+    // General health & medical
+    'blood pressure', 'heart disease', 'diabetes', 'cancer risk',
+    'inflammation', 'immune', 'longevity', 'anti-aging', 'skin health',
+    'joint', 'bone density', 'fertility', 'sperm', 'libido',
+    'sleep', 'insomnia', 'circadian', 'stress', 'anxiety',
+    'posture', 'injury', 'chronic pain', 'arthritis',
+    'urologist', 'cardiologist', 'doctor', 'clinical study',
+    'side effect', 'health benefit', 'peer reviewed', 'evidence',
   ];
 
   function hasFitnessContent(text) {
@@ -65,7 +85,7 @@
     return hash.toString(36);
   }
 
-  // ── YouTube transcript extraction ──────────────────────────────────────────
+  // ── YouTube transcript extraction (via backend SerpAPI proxy) ─────────────
 
   function formatTimestamp(seconds) {
     const s = Math.floor(seconds);
@@ -79,223 +99,35 @@
     return match ? match[1] : null;
   }
 
-  function extractCaptionUrlFromScripts() {
+  async function fetchTranscriptFromBackend(videoId) {
     try {
-      const scripts = document.querySelectorAll('script');
-      for (const script of scripts) {
-        const text = script.textContent || '';
-        const idx = text.indexOf('ytInitialPlayerResponse');
-        if (idx === -1) continue;
-
-        const jsonStart = text.indexOf('{', idx);
-        if (jsonStart === -1) continue;
-
-        let depth = 0;
-        let jsonEnd = jsonStart;
-        for (let i = jsonStart; i < text.length; i++) {
-          if (text[i] === '{') depth++;
-          else if (text[i] === '}') depth--;
-          if (depth === 0) { jsonEnd = i + 1; break; }
-        }
-
-        const json = JSON.parse(text.slice(jsonStart, jsonEnd));
-        return pickCaptionTrack(json);
-      }
-    } catch (err) {
-      console.log('[Veritas] Script extraction failed:', err.message);
-    }
-    return null;
-  }
-
-  function pickCaptionTrack(playerResponse) {
-    const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (!tracks || tracks.length === 0) return null;
-
-    const enTrack = tracks.find(t =>
-      t.languageCode === 'en' || t.languageCode?.startsWith('en')
-    );
-    const track = enTrack || tracks[0];
-    return track?.baseUrl || null;
-  }
-
-  async function extractCaptionUrl() {
-    // Method 1: Parse from inline script tags (works on full page loads)
-    const fromScript = extractCaptionUrlFromScripts();
-    if (fromScript) {
-      console.log('[Veritas] Caption URL found in inline scripts');
-      return fromScript;
-    }
-
-    // Method 2: Call YouTube's innertube player API (works on SPA navigations)
-    const videoId = getVideoId();
-    if (!videoId) return null;
-
-    try {
-      const res = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoId,
-          context: {
-            client: {
-              clientName: 'WEB',
-              clientVersion: '2.20240101.00.00',
-            },
-          },
-        }),
+      console.log(`[Veritas] Fetching transcript from backend for video ${videoId}...`);
+      const response = await chrome.runtime.sendMessage({
+        type: 'FETCH_TRANSCRIPT',
+        videoId,
       });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const url = pickCaptionTrack(data);
-      if (url) console.log('[Veritas] Caption URL found via innertube API');
-      return url;
+
+      if (response.error) {
+        console.log(`[Veritas] Backend transcript error: ${response.error}`);
+        return null;
+      }
+
+      const segments = (response.segments || [])
+        .filter(seg => seg.snippet && seg.snippet.trim())
+        .map(seg => ({
+          start: seg.start_ms / 1000,
+          dur: (seg.end_ms - seg.start_ms) / 1000,
+          text: seg.snippet.trim(),
+        }));
+
+      if (segments.length > 0) {
+        console.log(`[Veritas] Backend returned ${segments.length} transcript segments (${response.fetch_time_ms}ms)`);
+      } else {
+        console.log('[Veritas] Backend returned no transcript segments');
+      }
+      return segments.length > 0 ? segments : null;
     } catch (err) {
-      console.log('[Veritas] Innertube API failed:', err.message);
-      return null;
-    }
-  }
-
-  async function fetchTranscript(captionUrl) {
-    // Try multiple format variants — YouTube's timedtext API is inconsistent
-    const urls = [
-      captionUrl,                                                         // raw (usually json3)
-      `${captionUrl}${captionUrl.includes('?') ? '&' : '?'}fmt=srv3`,    // XML srv3
-      `${captionUrl}${captionUrl.includes('?') ? '&' : '?'}fmt=vtt`,     // WebVTT
-    ];
-
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, { credentials: 'include' });
-        if (!res.ok) continue;
-        const body = await res.text();
-        if (!body || body.length < 10) continue;
-
-        console.log(`[Veritas] Transcript fetched (${body.length} chars) from: ...${url.slice(-30)}`);
-
-        // Try XML first
-        const xmlSegs = parseTranscriptXml(body);
-        if (xmlSegs && xmlSegs.length > 0) return xmlSegs;
-
-        // Try JSON3
-        const jsonSegs = parseTranscriptJson3(body);
-        if (jsonSegs && jsonSegs.length > 0) return jsonSegs;
-
-        // Try VTT
-        const vttSegs = parseTranscriptVtt(body);
-        if (vttSegs && vttSegs.length > 0) return vttSegs;
-      } catch (_) {
-        continue;
-      }
-    }
-
-    console.log('[Veritas] All transcript fetch attempts failed');
-    return null;
-  }
-
-  function parseTranscriptVtt(body) {
-    try {
-      if (!body.includes('WEBVTT')) return null;
-      const segments = [];
-      // Match timestamp lines: 00:00:01.234 --> 00:00:05.678
-      const blocks = body.split(/\n\n+/);
-      for (const block of blocks) {
-        const match = block.match(/(\d{1,2}):(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})\.(\d{3})/);
-        if (!match) continue;
-        const start = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]) + parseInt(match[4]) / 1000;
-        const end = parseInt(match[5]) * 3600 + parseInt(match[6]) * 60 + parseInt(match[7]) + parseInt(match[8]) / 1000;
-        // Text is everything after the timestamp line
-        const lines = block.split('\n');
-        const tsIdx = lines.findIndex(l => l.includes('-->'));
-        const text = lines.slice(tsIdx + 1).join(' ').replace(/<[^>]+>/g, '').trim();
-        if (text) {
-          segments.push({ start, dur: end - start, text });
-        }
-      }
-      return segments.length > 0 ? segments : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function parseTranscriptXml(body) {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(body, 'text/xml');
-      // Check for parse errors
-      if (doc.querySelector('parsererror')) return null;
-      const textEls = doc.querySelectorAll('text');
-      if (textEls.length === 0) return null;
-
-      const segments = [];
-      textEls.forEach(el => {
-        const start = parseFloat(el.getAttribute('start') || '0');
-        const dur = parseFloat(el.getAttribute('dur') || '0');
-        // Decode HTML entities in the transcript text
-        const tmp = document.createElement('textarea');
-        tmp.innerHTML = el.textContent || '';
-        const content = tmp.value.replace(/\n/g, ' ').trim();
-        if (content) {
-          segments.push({ start, dur, text: content });
-        }
-      });
-      return segments;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function parseTranscriptJson3(body) {
-    try {
-      const json = JSON.parse(body);
-      const events = json?.events;
-      if (!Array.isArray(events)) return null;
-
-      const segments = [];
-      for (const event of events) {
-        // Skip events without text segments (e.g. window-style events)
-        const segs = event.segs;
-        if (!segs) continue;
-
-        const start = (event.tStartMs || 0) / 1000;
-        const dur = (event.dDurationMs || 0) / 1000;
-        const text = segs.map(s => s.utf8 || '').join('').replace(/\n/g, ' ').trim();
-        if (text) {
-          segments.push({ start, dur, text });
-        }
-      }
-      return segments.length > 0 ? segments : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function extractFromTextTracks() {
-    try {
-      const video = document.querySelector('video');
-      if (!video || !video.textTracks) return null;
-
-      // Find an active/loaded text track (captions or subtitles)
-      let track = null;
-      for (let i = 0; i < video.textTracks.length; i++) {
-        const t = video.textTracks[i];
-        if ((t.kind === 'captions' || t.kind === 'subtitles') && t.cues && t.cues.length > 0) {
-          track = t;
-          break;
-        }
-      }
-      if (!track || !track.cues || track.cues.length === 0) return null;
-
-      console.log(`[Veritas] Fallback: extracting from textTrack (${track.cues.length} cues)`);
-      const segments = [];
-      for (let i = 0; i < track.cues.length; i++) {
-        const cue = track.cues[i];
-        const text = (cue.text || '').replace(/\n/g, ' ').trim();
-        if (text) {
-          segments.push({ start: cue.startTime, dur: cue.endTime - cue.startTime, text });
-        }
-      }
-      return segments.length > 0 ? segments : null;
-    } catch (_) {
+      console.log(`[Veritas] Backend transcript fetch failed: ${err.message}`);
       return null;
     }
   }
@@ -430,16 +262,6 @@
         }
       }
 
-      // Pinned/top comments
-      const comments = document.querySelectorAll(
-        'ytd-comment-thread-renderer #content-text'
-      );
-      comments.forEach((el) => {
-        if (el.innerText && el.innerText.length > MIN_TEXT_LENGTH) {
-          targets.push({ element: el, text: el.innerText, type: 'comment' });
-        }
-      });
-
       console.log(`[Veritas] YouTube extractor found: ${targets.map(t => `${t.type}(${t.text.length}ch)`).join(', ') || 'nothing'}`);
       return targets;
     },
@@ -513,6 +335,11 @@
     return null;
   }
 
+  let overlayExpanded = false;
+  let overlayDismissed = false;
+  let timestampWatcher = null;
+  let shownClaimTimestamps = new Set();
+
   function addClaims(newClaims) {
     const existing = new Set(collectedClaims.map(c => c.text.toLowerCase()));
     for (const claim of newClaims) {
@@ -521,10 +348,62 @@
         existing.add(claim.text.toLowerCase());
       }
     }
-    renderOverlay();
+    renderAlertPill();
+    startTimestampWatcher();
   }
 
-  function renderOverlay() {
+  function getSeverity() {
+    const highRisk = collectedClaims.filter(c => c.risk_level === 'high');
+    const medRisk = collectedClaims.filter(c => c.risk_level === 'medium');
+    return highRisk.length > 0 ? 'high' : medRisk.length > 0 ? 'medium' : 'low';
+  }
+
+  // ── Alert pill (compact notification) ────────────────────────────────────
+
+  function renderAlertPill() {
+    if (overlayExpanded || overlayDismissed) return;
+    if (collectedClaims.length === 0) return;
+
+    // Remove existing pill
+    document.querySelectorAll('.veritas-alert-pill').forEach(el => el.remove());
+
+    const container = getVideoContainer();
+    if (!container) return;
+
+    const severity = getSeverity();
+    const pill = document.createElement('div');
+    pill.className = 'veritas-alert-pill';
+    pill.setAttribute('data-veritas', 'true');
+    pill.innerHTML = `
+      <span class="veritas-alert-dot veritas-alert-dot-${severity}"></span>
+      <span class="veritas-alert-logo">Veritas</span>
+      <span class="veritas-alert-text">${collectedClaims.length} claim${collectedClaims.length !== 1 ? 's' : ''} to verify</span>
+      <span class="veritas-alert-expand">\u203A</span>
+    `;
+
+    pill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      expandOverlay();
+    });
+
+    container.style.position = container.style.position || 'relative';
+    container.appendChild(pill);
+    console.log(`[Veritas] Alert pill shown: ${collectedClaims.length} claim(s)`);
+
+    // Inject progress bar markers
+    const timestampedClaims = collectedClaims.filter(c => c.start_time != null);
+    if (timestampedClaims.length > 0) {
+      injectProgressMarkers(timestampedClaims);
+    }
+  }
+
+  // ── Expanded overlay (slides in from right) ──────────────────────────────
+
+  function expandOverlay(highlightClaimIndex = -1) {
+    overlayExpanded = true;
+
+    // Remove pill
+    document.querySelectorAll('.veritas-alert-pill').forEach(el => el.remove());
     // Remove existing overlay
     document.querySelectorAll('.veritas-live-overlay').forEach(el => el.remove());
 
@@ -533,20 +412,18 @@
     const container = getVideoContainer();
     if (!container) {
       console.log('[Veritas] No video container found — retrying in 2s');
-      setTimeout(renderOverlay, 2000);
+      setTimeout(() => expandOverlay(highlightClaimIndex), 2000);
       return;
     }
 
     const overlay = document.createElement('div');
-    overlay.className = 'veritas-live-overlay';
+    overlay.className = 'veritas-live-overlay veritas-slide-in';
     overlay.setAttribute('data-veritas', 'true');
 
-    const highRisk = collectedClaims.filter(c => c.risk_level === 'high');
-    const medRisk = collectedClaims.filter(c => c.risk_level === 'medium');
-    const severity = highRisk.length > 0 ? 'high' : medRisk.length > 0 ? 'medium' : 'low';
+    const severity = getSeverity();
     overlay.classList.add(`veritas-severity-${severity}`);
 
-    // Header with title, claim count, and close/minimize buttons
+    // Header
     const header = document.createElement('div');
     header.className = 'veritas-header';
 
@@ -562,7 +439,7 @@
     closeBtn.textContent = '\u2715';
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      overlay.remove();
+      collapseOverlay();
     });
 
     header.appendChild(headerLeft);
@@ -572,13 +449,17 @@
     const severityBar = document.createElement('div');
     severityBar.className = 'veritas-severity-bar';
 
-    // Claims list — shown by default
+    // Claims list (scrollable)
     const claimsList = document.createElement('div');
     claimsList.className = 'veritas-claims-list';
 
-    collectedClaims.forEach((claim) => {
+    collectedClaims.forEach((claim, idx) => {
       const claimEl = document.createElement('div');
       claimEl.className = `veritas-claim veritas-claim-${claim.risk_level}`;
+      if (idx === highlightClaimIndex) {
+        claimEl.classList.add('veritas-claim-active');
+      }
+      claimEl.setAttribute('data-claim-idx', idx);
 
       const timestampHtml = claim.timestamp_label
         ? `<span class="veritas-timestamp" data-seek="${claim.start_time || 0}">${escapeHtml(claim.timestamp_label)}</span>`
@@ -597,7 +478,6 @@
         </div>
       `;
 
-      // Bind click-to-seek on timestamp badge
       const tsBtn = claimEl.querySelector('.veritas-timestamp');
       if (tsBtn) {
         tsBtn.addEventListener('click', (e) => {
@@ -623,13 +503,11 @@
     });
     claimsList.appendChild(deepCheck);
 
-    // Minimize: clicking header toggles claims list visibility
+    // Minimize: clicking header collapses back to pill
     header.addEventListener('click', (e) => {
       if (e.target.closest('.veritas-close-btn')) return;
       e.stopPropagation();
-      const isVisible = claimsList.style.display !== 'none';
-      claimsList.style.display = isVisible ? 'none' : 'block';
-      severityBar.style.display = isVisible ? 'none' : 'block';
+      collapseOverlay();
     });
     header.style.cursor = 'pointer';
 
@@ -639,12 +517,89 @@
 
     container.style.position = container.style.position || 'relative';
     container.appendChild(overlay);
-    console.log(`[Veritas] Overlay injected on video player with ${collectedClaims.length} claim(s)`);
+    console.log(`[Veritas] Overlay expanded with ${collectedClaims.length} claim(s)`);
 
-    // Inject progress bar markers for claims with timestamps
+    // Scroll to highlighted claim
+    if (highlightClaimIndex >= 0) {
+      const activeEl = claimsList.querySelector('.veritas-claim-active');
+      if (activeEl) {
+        setTimeout(() => activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+      }
+    }
+
+    // Inject progress bar markers
     const timestampedClaims = collectedClaims.filter(c => c.start_time != null);
     if (timestampedClaims.length > 0) {
       injectProgressMarkers(timestampedClaims);
+    }
+  }
+
+  function collapseOverlay() {
+    overlayExpanded = false;
+    const overlay = document.querySelector('.veritas-live-overlay');
+    if (overlay) {
+      overlay.classList.remove('veritas-slide-in');
+      overlay.classList.add('veritas-slide-out');
+      overlay.addEventListener('animationend', () => {
+        overlay.remove();
+        renderAlertPill();
+      }, { once: true });
+    } else {
+      renderAlertPill();
+    }
+  }
+
+  // ── Timestamp watcher (triggers slide-in at claim timestamps) ────────────
+
+  function startTimestampWatcher() {
+    if (timestampWatcher) return; // already running
+    if (PLATFORM !== 'youtube') return;
+
+    const video = document.querySelector('video');
+    if (!video) return;
+
+    timestampWatcher = setInterval(() => {
+      if (overlayDismissed) { clearInterval(timestampWatcher); return; }
+
+      const currentTime = video.currentTime;
+      for (let i = 0; i < collectedClaims.length; i++) {
+        const claim = collectedClaims[i];
+        if (claim.start_time == null) continue;
+
+        // Trigger when video enters the claim's time window (within 2 seconds)
+        const key = `${i}_${claim.start_time}`;
+        if (shownClaimTimestamps.has(key)) continue;
+
+        if (currentTime >= claim.start_time && currentTime <= claim.start_time + 3) {
+          shownClaimTimestamps.add(key);
+          console.log(`[Veritas] Timestamp hit: claim ${i} at ${formatTimestamp(claim.start_time)}`);
+
+          // If not expanded, slide the overlay in and highlight this claim
+          if (!overlayExpanded) {
+            expandOverlay(i);
+          } else {
+            // Already expanded — just highlight and scroll to the active claim
+            highlightActiveClaim(i);
+          }
+          break;
+        }
+      }
+    }, 500);
+  }
+
+  function highlightActiveClaim(idx) {
+    const overlay = document.querySelector('.veritas-live-overlay');
+    if (!overlay) return;
+
+    // Remove previous highlights
+    overlay.querySelectorAll('.veritas-claim-active').forEach(el =>
+      el.classList.remove('veritas-claim-active')
+    );
+
+    const claimEl = overlay.querySelector(`[data-claim-idx="${idx}"]`);
+    if (claimEl) {
+      claimEl.classList.add('veritas-claim-active');
+      claimEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
 
@@ -667,8 +622,10 @@
     console.log('[Veritas] Extension context invalidated — tearing down');
     if (scanDebounce) clearTimeout(scanDebounce);
     if (urlCheckInterval) clearInterval(urlCheckInterval);
+    if (timestampWatcher) clearInterval(timestampWatcher);
     observer.disconnect();
     document.querySelectorAll('.veritas-live-overlay').forEach(el => el.remove());
+    document.querySelectorAll('.veritas-alert-pill').forEach(el => el.remove());
     clearProgressMarkers();
   }
 
@@ -685,17 +642,24 @@
 
     for (const target of targets) {
       if (!target.text || target.text.length < MIN_TEXT_LENGTH) continue;
-      if (scannedElements.has(target.element)) continue;
+
+      // Rescan elements whose text grew significantly (YouTube lazy-loads
+      // descriptions — first render is often truncated to ~400 chars).
+      const prevLen = scannedElementLengths.get(target.element) || 0;
+      const grewSignificantly = prevLen > 0 && target.text.length > prevLen * 2 && target.text.length - prevLen > 200;
+      if (scannedElements.has(target.element) && !grewSignificantly) continue;
 
       const hash = textHash(target.text);
       if (scannedTexts.has(hash)) {
         scannedElements.add(target.element);
+        scannedElementLengths.set(target.element, target.text.length);
         continue;
       }
 
       if (!hasFitnessContent(target.text)) {
         scannedTexts.add(hash);
         scannedElements.add(target.element);
+        scannedElementLengths.set(target.element, target.text.length);
         continue;
       }
 
@@ -708,6 +672,7 @@
       for (const target of toScan) {
         scannedTexts.add(target.hash);
         scannedElements.add(target.element);
+        scannedElementLengths.set(target.element, target.text.length);
 
         try {
           console.log(`[Veritas] Sending LIVE_SCAN for "${target.type}" (${target.text.length} chars)...`);
@@ -736,76 +701,70 @@
     }
 
     // ── YouTube transcript scanning ──────────────────────────────────────────
-    if (PLATFORM === 'youtube' && !scannedTexts.has('__transcript__')) {
+    if (PLATFORM === 'youtube' && !transcriptScanActive && !scannedTexts.has('__transcript_done__')) {
       await scanTranscript();
     }
   }
 
-  async function scanTranscript(retry = false) {
-    // Mark as scanned immediately to prevent duplicate calls from scanPage()
-    scannedTexts.add('__transcript__');
+  async function scanTranscript() {
+    // Concurrency lock — only one transcript scan can run at a time
+    if (transcriptScanActive) return;
+    transcriptScanActive = true;
 
-    // Extract caption URL (tries inline scripts, then innertube API)
-    let captionUrl = await extractCaptionUrl();
-
-    if (!captionUrl && !retry) {
-      console.log('[Veritas] No captions found — retrying in 3s');
-      await new Promise(r => setTimeout(r, 3000));
-      captionUrl = await extractCaptionUrl();
-    }
-
-    let segments = null;
-
-    if (captionUrl) {
-      segments = await fetchTranscript(captionUrl);
-    }
-
-    // Fallback: extract from the video element's text tracks (auto-captions)
-    if (!segments || segments.length === 0) {
-      segments = extractFromTextTracks();
-    }
-
-    if (segments && segments.length > 0) {
-      console.log(`[Veritas] Transcript extracted: ${segments.length} segments`);
-
-      const transcriptText = chunkTranscript(segments);
-      if (transcriptText.length >= MIN_TEXT_LENGTH && hasFitnessContent(transcriptText)) {
-        const hash = textHash(transcriptText);
-        try {
-          console.log(`[Veritas] Sending LIVE_SCAN for "transcript" (${transcriptText.length} chars)...`);
-          const response = await chrome.runtime.sendMessage({
-            type: 'LIVE_SCAN',
-            text: transcriptText,
-            url: location.href,
-            platform: PLATFORM,
-            contentType: 'transcript',
-            hash,
-          });
-
-          if (response && response.claims && response.claims.length > 0) {
-            console.log(`[Veritas] Adding ${response.claims.length} transcript claim(s) to overlay`);
-            addClaims(response.claims);
-          } else {
-            console.log('[Veritas] No transcript claims returned');
-          }
-          return;
-        } catch (err) {
-          if (isContextInvalidated(err)) { teardown(); return; }
-          console.error('[Veritas] Transcript scan error:', err);
-          return;
-        }
+    try {
+      const videoId = getVideoId();
+      if (!videoId) {
+        console.log('[Veritas] No video ID found — skipping transcript');
+        return;
       }
-    }
 
-    // Fallback: combine title + description + comments into a single scan
-    console.log('[Veritas] No transcript available — falling back to combined page text');
-    await scanCombinedPageText();
+      const segments = await fetchTranscriptFromBackend(videoId);
+
+      if (segments && segments.length > 0) {
+        scannedTexts.add('__transcript_done__');
+        const transcriptText = chunkTranscript(segments);
+
+        if (transcriptText.length >= MIN_TEXT_LENGTH && hasFitnessContent(transcriptText)) {
+          const hash = textHash(transcriptText);
+          try {
+            console.log(`[Veritas] Sending LIVE_SCAN for "transcript" (${transcriptText.length} chars)...`);
+            const response = await chrome.runtime.sendMessage({
+              type: 'LIVE_SCAN',
+              text: transcriptText,
+              url: location.href,
+              platform: PLATFORM,
+              contentType: 'transcript',
+              hash,
+            });
+
+            if (response && response.claims && response.claims.length > 0) {
+              console.log(`[Veritas] Adding ${response.claims.length} transcript claim(s) to overlay`);
+              addClaims(response.claims);
+            } else {
+              console.log('[Veritas] No transcript claims returned');
+            }
+          } catch (err) {
+            if (isContextInvalidated(err)) { teardown(); return; }
+            console.error('[Veritas] Transcript scan error:', err);
+          }
+        } else {
+          console.log('[Veritas] Transcript too short or no fitness content');
+        }
+        return;
+      }
+
+      // No transcript — fall back to combined page text (title + description)
+      scannedTexts.add('__transcript_done__');
+      console.log('[Veritas] No transcript available — falling back to combined page text');
+      await scanCombinedPageText();
+    } finally {
+      transcriptScanActive = false;
+    }
   }
 
   async function scanCombinedPageText() {
     if (!contextValid) return;
 
-    // Gather all available page text (title, description, comments)
     const extractor = extractors[PLATFORM];
     if (!extractor) return;
 
@@ -888,9 +847,15 @@
       lastUrl = location.href;
       // Remove stale overlays, progress markers, and reset all state for the new video
       document.querySelectorAll('.veritas-live-overlay').forEach(el => el.remove());
+      document.querySelectorAll('.veritas-alert-pill').forEach(el => el.remove());
       clearProgressMarkers();
       collectedClaims = [];
       scannedTexts.clear();
+      transcriptScanActive = false;
+      overlayExpanded = false;
+      overlayDismissed = false;
+      shownClaimTimestamps.clear();
+      if (timestampWatcher) { clearInterval(timestampWatcher); timestampWatcher = null; }
       debouncedScan();
     }
   }
@@ -951,6 +916,6 @@
   // Poll for URL changes (pushState doesn't fire popstate)
   urlCheckInterval = setInterval(checkUrlChange, 1000);
 
-  // Initial scan after page is settled
+  // Initial scan after page settles
   setTimeout(scanPage, 2000);
 })();

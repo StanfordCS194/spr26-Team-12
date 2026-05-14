@@ -235,3 +235,17 @@ class QuickScanResponse(BaseModel):
     claims: List[QuickScanClaim]
     scan_time_ms: int
     flagged: bool = False
+
+
+# --- YouTube transcript (SerpAPI proxy) ---
+class TranscriptSegment(BaseModel):
+    start_ms: int
+    end_ms: int
+    snippet: str
+    start_time_text: str = ""
+
+
+class TranscriptResponse(BaseModel):
+    video_id: str
+    segments: List[TranscriptSegment]
+    fetch_time_ms: int = 0
