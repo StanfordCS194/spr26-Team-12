@@ -16,18 +16,33 @@ from ..models import QuickScanClaim, QuickScanResponse
 from . import ai_client
 
 FITNESS_KEYWORDS = {
-    "creatine", "bcaa", "protein", "supplement", "testosterone", "fat burn",
-    "weight loss", "muscle", "workout", "pre-workout", "collagen", "tongkat",
-    "ashwagandha", "metabolism", "cortisol", "hormone", "gains", "bulking",
-    "cutting", "macros", "calories", "whey", "casein", "amino acid",
-    "hypertrophy", "anabolic", "catabolic", "recovery", "soreness",
-    "inflammation", "detox", "cleanse", "gut health", "superfood",
-    "keto", "intermittent fasting", "carbs", "insulin", "glycemic",
-    "electrolytes", "hydration", "cardio", "hiit", "vo2 max",
-    "flexibility", "mobility", "posture", "sleep", "melatonin",
+    # Supplements & ingredients
+    "creatine", "bcaa", "protein", "supplement", "collagen", "tongkat",
+    "ashwagandha", "whey", "casein", "amino acid", "pre-workout",
+    "probiotic", "vitamin", "magnesium", "zinc", "omega-3", "fish oil",
+    "shilajit", "melatonin", "electrolytes", "antioxidant", "superfood",
+    # Hormones & biology
+    "testosterone", "estrogen", "cortisol", "hormone", "insulin",
+    "metabolism", "anabolic", "catabolic", "endocrine", "thyroid",
+    "serotonin", "dopamine", "growth hormone",
+    # Fitness & training
+    "muscle", "workout", "hypertrophy", "gains", "bulking", "cutting",
+    "fat burn", "weight loss", "cardio", "hiit", "vo2 max",
+    "recovery", "soreness", "overtraining",
+    # Nutrition & diet
+    "macros", "calories", "keto", "intermittent fasting", "carbs",
+    "glycemic", "cholesterol", "saturated fat", "fiber",
+    "gut health", "microbiome", "detox", "cleanse", "diet",
+    # General health & medical
+    "blood pressure", "heart disease", "diabetes", "cancer risk",
+    "inflammation", "immune", "longevity", "anti-aging", "skin health",
+    "joint", "bone density", "fertility", "sperm", "libido",
+    "sleep", "insomnia", "circadian", "stress",
+    "flexibility", "mobility", "posture", "hydration",
+    "side effect", "health benefit", "clinical study",
 }
 
-_PRESCREEN_THRESHOLD = 0.5
+_PRESCREEN_THRESHOLD = 0.3
 
 
 def _has_fitness_content(text: str) -> bool:
@@ -37,9 +52,19 @@ def _has_fitness_content(text: str) -> bool:
 
 async def _prescreen(text: str) -> float:
     """Return 0-1 confidence that the text contains fact-checkable health claims."""
-    prompt = f"""Does this text contain specific, verifiable health or fitness claims that a viewer might follow as advice?
-Do NOT count personal anecdotes, figures of speech, opinions, or common knowledge.
-Only count concrete cause-and-effect assertions or specific recommendations.
+    prompt = f"""Does this text discuss health, fitness, supplements, nutrition, or exercise in a way that a viewer might take as advice or guidance?
+
+Score 0.7-1.0 if it contains ANY of:
+- Supplement recommendations or claims (e.g. "creatine builds muscle")
+- Diet or nutrition advice (e.g. "eat 1g protein per pound")
+- Exercise or training guidance (e.g. "you should train to failure")
+- Health cause-and-effect statements (e.g. "fasting boosts testosterone")
+- Product endorsements with health benefits
+
+Score 0.3-0.6 if the text mentions fitness topics but only in passing.
+Score 0.0-0.2 ONLY if the text has nothing to do with health or fitness advice.
+
+Be generous — if in doubt, score higher. The text already matched fitness keywords.
 
 Return ONLY valid JSON: {{"score": 0.0 to 1.0, "reason": "one sentence"}}
 
@@ -49,7 +74,7 @@ Text (first 1500 chars):
     raw = await ai_client.generate_text(
         prompt,
         provider=config.PRIMARY_LLM_PROVIDER,
-        system="You quickly assess whether fitness content contains verifiable health claims. Return JSON only.",
+        system="You assess whether content discusses health or fitness topics. Be generous — most fitness creator content should score above 0.5. Return JSON only.",
         json_mode=True,
         temperature=0.0,
         timeout=8.0,
@@ -102,13 +127,15 @@ async def scan(
 - Set end_time to the start_time of the next segment or start_time + 30 if it's the last.
 - Set timestamp_label to the human-readable [M:SS] string (without brackets)."""
 
-    prompt = f"""Extract concrete health/fitness claims from this text that could mislead viewers.
+    prompt = f"""Extract health, fitness, or supplement claims from this text that a viewer might act on.
 
 Rules:
-- Only extract verifiable cause-and-effect claims or specific health recommendations.
-- Skip figures of speech, anecdotes, opinions, common knowledge, and personal results.
+- Extract any specific health claim, recommendation, or cause-and-effect statement.
+- Include claims about supplements, diets, exercises, hormones, medical topics, etc.
+- Include claims even if they are stated as facts or educational content — they still need checking.
+- Skip purely personal stories ("I felt great"), greetings, and non-health content.
 - Up to 5 claims max. For each, give a one-sentence scientific verdict.
-- risk_level: "high" = dangerous, "medium" = misleading/exaggerated, "low" = minor inaccuracy.
+- risk_level: "high" = potentially dangerous if wrong, "medium" = misleading/exaggerated, "low" = minor or likely accurate.
 - confidence: your assessment confidence.
 - category: supplement, training, nutrition, weight_loss, muscle_gain, hormones, recovery, sleep, injury, product_marketing, medical_boundary, or other.{timestamp_rules}
 
@@ -126,7 +153,7 @@ Return ONLY valid JSON:
   ]
 }}
 
-If no dubious claims found, return {{"claims": []}}.
+If the text contains NO health or fitness claims at all, return {{"claims": []}}.
 
 Text{f' (from {platform})' if platform else ''}:
 {text}""".strip()
@@ -134,14 +161,16 @@ Text{f' (from {platform})' if platform else ''}:
     raw = await ai_client.generate_text(
         prompt,
         provider=config.PRIMARY_LLM_PROVIDER,
-        system="You are a precise fitness-science fact checker. Only flag concrete, verifiable health claims. Return valid JSON only.",
+        system="You extract health and fitness claims from text. Be inclusive — extract any claim a viewer might follow as advice. Return valid JSON only.",
         json_mode=True,
         temperature=0.0,
         timeout=15.0,
     )
 
+    print(f"[QUICK-SCAN] Extraction raw response: {(raw or '(none)')[:300]}")
     parsed = ai_client.parse_json_loose(raw or "")
     if not parsed or not isinstance(parsed, dict):
+        print("[QUICK-SCAN] Failed to parse extraction response")
         return QuickScanResponse(claims=[], scan_time_ms=0, flagged=False)
 
     claims = []

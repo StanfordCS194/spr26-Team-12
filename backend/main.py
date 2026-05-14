@@ -1,10 +1,12 @@
 """FastAPI entrypoint. Run with: uvicorn backend.main:app --reload"""
 from __future__ import annotations
 
+import logging
 import re
 import time
 import uuid
 
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,9 +22,13 @@ from .models import (
     ProviderStatus,
     QuickScanRequest,
     QuickScanResponse,
+    TranscriptResponse,
+    TranscriptSegment,
     Verdict,
     VerdictRequest,
 )
+
+logger = logging.getLogger("veritas")
 from .pipeline import clip_checker, extractor, quick_scan, transcriber, verdict as verdict_pipeline
 from .pipeline import credibility
 
@@ -137,6 +143,51 @@ async def quick_scan_endpoint(req: QuickScanRequest) -> QuickScanResponse:
     result = await quick_scan.scan(req.text, url=req.url, platform=req.platform, content_type=req.content_type)
     result.scan_time_ms = int((time.perf_counter() - t0) * 1000)
     return result
+
+
+@app.get("/api/transcript/{video_id}", response_model=TranscriptResponse)
+async def get_transcript(video_id: str) -> TranscriptResponse:
+    """Fetch YouTube transcript via SerpAPI and return timestamped segments."""
+    if not config.SERPAPI_API_KEY:
+        raise HTTPException(status_code=503, detail="SERPAPI_API_KEY not configured")
+    if len(video_id) != 11:
+        raise HTTPException(status_code=400, detail="Invalid video ID")
+
+    t0 = time.perf_counter()
+    params = {
+        "engine": "youtube_video_transcript",
+        "v": video_id,
+        "lang": "en",
+        "api_key": config.SERPAPI_API_KEY,
+    }
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            res = await client.get("https://serpapi.com/search.json", params=params)
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="SerpAPI request timed out")
+
+    if res.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"SerpAPI returned HTTP {res.status_code}")
+
+    data = res.json()
+    raw_segments = data.get("transcript", [])
+    if not raw_segments:
+        raise HTTPException(status_code=404, detail="No transcript available for this video")
+
+    segments = [
+        TranscriptSegment(
+            start_ms=seg.get("start_ms", 0),
+            end_ms=seg.get("end_ms", 0),
+            snippet=seg.get("snippet", ""),
+            start_time_text=seg.get("start_time_text", ""),
+        )
+        for seg in raw_segments
+        if seg.get("snippet", "").strip()
+    ]
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    logger.info("[transcript] Got %d segments for %s in %dms", len(segments), video_id, elapsed_ms)
+    return TranscriptResponse(video_id=video_id, segments=segments, fetch_time_ms=elapsed_ms)
 
 
 @app.post("/api/verdict", response_model=Verdict)
