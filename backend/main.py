@@ -28,6 +28,7 @@ from .models import (
     VerdictRequest,
 )
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("veritas")
 from .pipeline import clip_checker, extractor, quick_scan, transcriber, verdict as verdict_pipeline
 from .pipeline import credibility

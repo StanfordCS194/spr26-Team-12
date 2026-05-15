@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Veritas — Fitness Bro Fact Checker",
-  "version": "0.2.4",
-  "description": "Live fact-check warnings for fitness claims on YouTube, Twitter/X, and TikTok. Highlight any health claim and verify it instantly.",
+  "name": "Veritas: Ending Misinformation",
+  "version": "0.2.5",
+  "description": "Live fact-check warnings on YouTube, Twitter/X, and TikTok. Highlight any claim and verify it instantly.",
   "permissions": [
     "storage",
     "contextMenus",
@@ -12,6 +12,8 @@
   ],
   "host_permissions": [
     "http://localhost/*",
+    "https://veritas-api-ka3y.onrender.com/*",
+    "https://veritas-api.onrender.com/*",
     "https://veritas-ruby.vercel.app/*",
     "https://*.youtube.com/*",
     "https://*.twitter.com/*",
@@ -28,15 +30,15 @@
     "default_popup": "popup.html",
     "default_title": "Veritas — Fact Checker",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/newIcon.png",
+      "48": "icons/newIcon.png",
+      "128": "icons/newIcon.png"
     }
   },
   "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "icons/newIcon.png",
+    "48": "icons/newIcon.png",
+    "128": "icons/newIcon.png"
   },
   "content_scripts": [
     {
@@ -56,5 +58,16 @@
       "run_at": "document_idle"
     }
   ],
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["sounds/ring.mp3", "sounds/poke.mp3"],
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://*.twitter.com/*",
+        "https://*.x.com/*",
+        "https://*.tiktok.com/*"
+      ]
+    }
+  ]
 }

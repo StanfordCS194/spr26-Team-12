@@ -6,6 +6,7 @@ of SDKs so setup stays light: users only need API keys in env vars.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Optional
 
 import httpx
@@ -55,7 +56,7 @@ async def _openai_chat(
     max_tokens: Optional[int] = None,
 ) -> Optional[str]:
     if not config.OPENAI_API_KEY:
-        print("[AI] OpenAI API key not configured — skipping LLM call")
+        logging.getLogger(__name__).warning("[AI] OpenAI API key not configured — skipping LLM call")
         return None
     payload = {
         "model": config.OPENAI_TEXT_MODEL,
@@ -81,7 +82,7 @@ async def _openai_chat(
             data = response.json()
             return data["choices"][0]["message"]["content"].strip() or None
     except Exception as exc:
-        print(f"[AI] OpenAI call failed: {exc}")
+        logging.getLogger(__name__).error(f"[AI] OpenAI call failed: {exc}")
         return None
 
 
@@ -95,7 +96,7 @@ async def _groq_chat(
     max_tokens: Optional[int] = None,
 ) -> Optional[str]:
     if not config.GROQ_API_KEY:
-        print("[AI] Groq API key not configured — skipping LLM call")
+        logging.getLogger(__name__).warning("[AI] Groq API key not configured — skipping LLM call")
         return None
     payload = {
         "model": config.GROQ_TEXT_MODEL,
@@ -121,7 +122,7 @@ async def _groq_chat(
             data = response.json()
             return data["choices"][0]["message"]["content"].strip() or None
     except Exception as exc:
-        print(f"[AI] Groq call failed: {exc}")
+        logging.getLogger(__name__).error(f"[AI] Groq call failed: {exc}")
         return None
 
 

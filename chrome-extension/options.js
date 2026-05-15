@@ -10,27 +10,32 @@ const testStatus     = document.getElementById('testStatus');
 const clearCacheBtn  = document.getElementById('clearCacheBtn');
 const cacheStatus    = document.getElementById('cacheStatus');
 const scanStats      = document.getElementById('scanStats');
+const alertSoundSel  = document.getElementById('alertSound');
+const previewSoundBtn = document.getElementById('previewSoundBtn');
 
 // Load saved values
 chrome.storage.sync.get(
   {
-    backendUrl: 'http://localhost:8000',
-    frontendUrl: 'https://veritas-ruby.vercel.app',
+    backendUrl: VERITAS_DEFAULT_BACKEND,
+    frontendUrl: VERITAS_DEFAULT_FRONTEND,
     liveScanEnabled: true,
+    alertSound: 'poke',
   },
-  ({ backendUrl, frontendUrl, liveScanEnabled }) => {
+  ({ backendUrl, frontendUrl, liveScanEnabled, alertSound }) => {
     backendInput.value  = backendUrl;
     frontendInput.value = frontendUrl;
     liveScanToggle.checked = liveScanEnabled;
+    alertSoundSel.value = alertSound;
   }
 );
 
 // Save
 saveBtn.addEventListener('click', () => {
-  const backendUrl  = backendInput.value.trim()  || 'http://localhost:8000';
-  const frontendUrl = frontendInput.value.trim() || 'https://veritas-ruby.vercel.app';
+  const backendUrl  = backendInput.value.trim()  || VERITAS_DEFAULT_BACKEND;
+  const frontendUrl = frontendInput.value.trim() || VERITAS_DEFAULT_FRONTEND;
   const liveScanEnabled = liveScanToggle.checked;
-  chrome.storage.sync.set({ backendUrl, frontendUrl, liveScanEnabled }, () => {
+  const alertSound = alertSoundSel.value;
+  chrome.storage.sync.set({ backendUrl, frontendUrl, liveScanEnabled, alertSound }, () => {
     saveStatus.textContent = 'Saved!';
     setTimeout(() => { saveStatus.textContent = ''; }, 2000);
   });
@@ -43,7 +48,7 @@ liveScanToggle.addEventListener('change', () => {
 
 // Test connection
 testBtn.addEventListener('click', async () => {
-  const url = (backendInput.value.trim() || 'http://localhost:8000').replace(/\/$/, '');
+  const url = (backendInput.value.trim() || VERITAS_DEFAULT_BACKEND).replace(/\/$/, '');
   testStatus.textContent = 'Connecting…';
   try {
     const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(5000) });
@@ -52,6 +57,12 @@ testBtn.addEventListener('click', async () => {
       const mode = data.demo_mode ? 'demo mode' : 'live mode';
       testStatus.textContent = `✓ Connected (${mode})`;
       testStatus.style.color = 'var(--green, #4ade80)';
+      const fromApi = typeof data.web_app_url === 'string' ? data.web_app_url.trim().replace(/\/$/, '') : '';
+      const curFe = (frontendInput.value.trim() || VERITAS_DEFAULT_FRONTEND).replace(/\/$/, '');
+      if (fromApi && /localhost|127\.0\.0\.1/i.test(curFe)) {
+        frontendInput.value = fromApi;
+        chrome.storage.sync.set({ frontendUrl: fromApi });
+      }
     } else {
       testStatus.textContent = `✗ HTTP ${res.status}`;
       testStatus.style.color = '#f87171';
@@ -78,6 +89,20 @@ clearCacheBtn.addEventListener('click', () => {
       cacheStatus.style.color = '';
     }, 2000);
   });
+});
+
+// Alert sound (instant save on change)
+alertSoundSel.addEventListener('change', () => {
+  chrome.storage.sync.set({ alertSound: alertSoundSel.value });
+});
+
+// Preview sound
+previewSoundBtn.addEventListener('click', () => {
+  const choice = alertSoundSel.value;
+  if (choice === 'off') return;
+  const audio = new Audio(`sounds/${choice}.mp3`);
+  audio.volume = 0.5;
+  audio.play().catch(() => {});
 });
 
 // Show scan stats

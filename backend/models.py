@@ -32,6 +32,15 @@ ClaimCategory = Literal[
     "injury",
     "product_marketing",
     "medical_boundary",
+    # Politics & current events
+    "politics",
+    "economics",
+    "environment",
+    "legal",
+    "statistics",
+    "history",
+    "science",
+    "conspiracy",
     "other",
 ]
 RiskLevel = Literal["low", "medium", "high"]
