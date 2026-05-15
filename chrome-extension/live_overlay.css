@@ -322,6 +322,27 @@
   background: var(--v-accent-hover);
 }
 
+.veritas-show-all-btn {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--v-accent);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.veritas-show-all-btn:hover {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: var(--v-accent);
+}
+
 /* Timestamp badge (click-to-seek) */
 .veritas-timestamp {
   display: inline-block;

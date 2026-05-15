@@ -30,12 +30,13 @@
   let urlCheckInterval = null;
   let contextValid = true;
   let transcriptScanActive = false; // prevents concurrent transcript scans
+  let alertSound = 'poke'; // 'poke', 'ring', or 'off'
   const DEBOUNCE_MS = 1500;
   const MIN_TEXT_LENGTH = 40;
 
-  // Health & fitness keywords for client-side pre-filter.
-  // Broad enough to catch general health claims (not just gym/supplement content).
-  const FITNESS_KEYWORDS = [
+  // Keywords for client-side pre-filter.
+  // Covers health/fitness AND politics/current-events/misinformation.
+  const CHECKABLE_KEYWORDS = [
     // Supplements & ingredients
     'creatine', 'bcaa', 'protein', 'supplement', 'collagen', 'tongkat',
     'ashwagandha', 'whey', 'casein', 'amino', 'pre-workout', 'probiotic',
@@ -61,12 +62,37 @@
     'posture', 'injury', 'chronic pain', 'arthritis',
     'urologist', 'cardiologist', 'doctor', 'clinical study',
     'side effect', 'health benefit', 'peer reviewed', 'evidence',
+    // Politics & governance
+    'election', 'democrat', 'republican', 'congress', 'senate',
+    'legislation', 'policy', 'regulation', 'bipartisan', 'filibuster',
+    'executive order', 'supreme court', 'amendment', 'electoral',
+    'immigration', 'border', 'deportation', 'asylum',
+    'geopolitics', 'sanctions', 'diplomacy', 'nato',
+    // Economics & finance
+    'inflation', 'gdp', 'recession', 'unemployment', 'federal reserve',
+    'interest rate', 'national debt', 'deficit', 'tariff', 'trade war',
+    'tax', 'subsidy', 'minimum wage', 'cost of living',
+    // Environment & climate
+    'climate change', 'global warming', 'carbon', 'emissions',
+    'renewable energy', 'fossil fuel', 'pollution', 'deforestation',
+    'greenhouse', 'net zero', 'paris agreement',
+    // Misinformation patterns
+    'conspiracy', 'cover-up', 'deep state', 'false flag', 'hoax',
+    'propaganda', 'misinformation', 'disinformation', 'fact check',
+    'debunked', 'mainstream media', 'censorship', 'big pharma',
+    // Science & statistics
+    'study shows', 'research proves', 'scientists say', 'data shows',
+    'percent', 'statistic', 'correlation', 'causation',
+    // Social issues
+    'crime rate', 'gun control', 'second amendment', 'abortion',
+    'vaccine', 'vaccination', 'pandemic', 'public health',
+    'education system', 'student debt', 'healthcare system',
   ];
 
-  function hasFitnessContent(text) {
+  function hasCheckableContent(text) {
     const lower = text.toLowerCase();
     let matches = 0;
-    for (const kw of FITNESS_KEYWORDS) {
+    for (const kw of CHECKABLE_KEYWORDS) {
       if (lower.includes(kw)) {
         matches++;
         if (matches >= 2) return true;
@@ -132,22 +158,25 @@
     }
   }
 
-  function chunkTranscript(segments, maxChars = 4800) {
-    // Format segments into ~60-second windows with [M:SS] timestamps
-    let result = '';
+  function chunkTranscript(segments) {
+    // Split transcript into ~60-second windows for parallel processing.
+    const WINDOW_SECS = 60;
+    const chunks = [];
+    let current = '';
     let windowStart = 0;
-    const WINDOW_SIZE = 60; // seconds
 
     for (const seg of segments) {
-      if (seg.start >= windowStart + WINDOW_SIZE) {
-        windowStart = Math.floor(seg.start / WINDOW_SIZE) * WINDOW_SIZE;
+      // Start a new chunk when we cross a window boundary
+      if (seg.start >= windowStart + WINDOW_SECS && current.length > 0) {
+        chunks.push(current.trim());
+        current = '';
+        windowStart = Math.floor(seg.start / WINDOW_SECS) * WINDOW_SECS;
       }
-      const line = `[${formatTimestamp(seg.start)}] ${seg.text}`;
-      if (result.length + line.length + 1 > maxChars) break;
-      result += line + '\n';
+      current += `[${formatTimestamp(seg.start)}] ${seg.text}\n`;
     }
+    if (current.trim()) chunks.push(current.trim());
 
-    return result.trim();
+    return chunks;
   }
 
   // ── Video seek ─────────────────────────────────────────────────────────────
@@ -453,7 +482,10 @@
     const claimsList = document.createElement('div');
     claimsList.className = 'veritas-claims-list';
 
-    collectedClaims.forEach((claim, idx) => {
+    const INITIAL_SHOW = 3;
+    const showAll = highlightClaimIndex >= INITIAL_SHOW; // auto-expand if highlighted claim is hidden
+
+    function renderClaim(claim, idx) {
       const claimEl = document.createElement('div');
       claimEl.className = `veritas-claim veritas-claim-${claim.risk_level}`;
       if (idx === highlightClaimIndex) {
@@ -486,8 +518,43 @@
         });
       }
 
+      return claimEl;
+    }
+
+    collectedClaims.forEach((claim, idx) => {
+      const claimEl = renderClaim(claim, idx);
+      if (!showAll && idx >= INITIAL_SHOW) {
+        claimEl.style.display = 'none';
+        claimEl.classList.add('veritas-hidden-claim');
+      }
       claimsList.appendChild(claimEl);
     });
+
+    // "Show all" / "Show less" button (only if there are more than INITIAL_SHOW)
+    if (collectedClaims.length > INITIAL_SHOW) {
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'veritas-show-all-btn';
+      toggleBtn.textContent = showAll
+        ? 'Show less'
+        : `Show all ${collectedClaims.length} claims`;
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const hidden = claimsList.querySelectorAll('.veritas-hidden-claim');
+        if (hidden.length > 0) {
+          hidden.forEach(el => { el.style.display = ''; el.classList.remove('veritas-hidden-claim'); });
+          toggleBtn.textContent = 'Show less';
+        } else {
+          claimsList.querySelectorAll('.veritas-claim').forEach((el, i) => {
+            if (i >= INITIAL_SHOW) {
+              el.style.display = 'none';
+              el.classList.add('veritas-hidden-claim');
+            }
+          });
+          toggleBtn.textContent = `Show all ${collectedClaims.length} claims`;
+        }
+      });
+      claimsList.appendChild(toggleBtn);
+    }
 
     const deepCheck = document.createElement('button');
     deepCheck.className = 'veritas-deep-check-btn';
@@ -573,6 +640,7 @@
         if (currentTime >= claim.start_time && currentTime <= claim.start_time + 3) {
           shownClaimTimestamps.add(key);
           console.log(`[Veritas] Timestamp hit: claim ${i} at ${formatTimestamp(claim.start_time)}`);
+          playAlertSound();
 
           // If not expanded, slide the overlay in and highlight this claim
           if (!overlayExpanded) {
@@ -607,6 +675,16 @@
     const div = document.createElement('div');
     div.textContent = str || '';
     return div.innerHTML;
+  }
+
+  function playAlertSound() {
+    if (alertSound === 'off') return;
+    try {
+      const url = chrome.runtime.getURL(`sounds/${alertSound}.mp3`);
+      const audio = new Audio(url);
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    } catch (_) { /* extension context may be invalid */ }
   }
 
   // ── Context invalidation handling ───────────────────────────────────────────
@@ -656,7 +734,7 @@
         continue;
       }
 
-      if (!hasFitnessContent(target.text)) {
+      if (!hasCheckableContent(target.text)) {
         scannedTexts.add(hash);
         scannedElements.add(target.element);
         scannedElementLengths.set(target.element, target.text.length);
@@ -706,6 +784,27 @@
     }
   }
 
+  const VIDEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  async function getVideoCache(videoId) {
+    try {
+      const key = `vc_${videoId}`;
+      const data = await chrome.storage.local.get(key);
+      const entry = data[key];
+      if (entry && Date.now() - entry.timestamp < VIDEO_CACHE_TTL_MS) {
+        return entry.claims;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function setVideoCache(videoId, claims) {
+    try {
+      const key = `vc_${videoId}`;
+      await chrome.storage.local.set({ [key]: { claims, timestamp: Date.now() } });
+    } catch (_) {}
+  }
+
   async function scanTranscript() {
     // Concurrency lock — only one transcript scan can run at a time
     if (transcriptScanActive) return;
@@ -718,37 +817,57 @@
         return;
       }
 
+      // ── Check persistent cache first ──────────────────────────────────────
+      const cached = await getVideoCache(videoId);
+      if (cached && cached.length > 0) {
+        scannedTexts.add('__transcript_done__');
+        console.log(`[Veritas] Cache HIT for video ${videoId} — ${cached.length} claim(s)`);
+        addClaims(cached);
+        return;
+      }
+
       const segments = await fetchTranscriptFromBackend(videoId);
 
       if (segments && segments.length > 0) {
         scannedTexts.add('__transcript_done__');
-        const transcriptText = chunkTranscript(segments);
+        const chunks = chunkTranscript(segments);
 
-        if (transcriptText.length >= MIN_TEXT_LENGTH && hasFitnessContent(transcriptText)) {
-          const hash = textHash(transcriptText);
+        if (chunks.length === 0) {
+          console.log('[Veritas] Transcript too short — skipping');
+          return;
+        }
+
+        console.log(`[Veritas] Scanning transcript in ${chunks.length} parallel chunk(s)...`);
+
+        // Fire all chunks in parallel — claims trickle into overlay as each resolves
+        const allClaims = [];
+        await Promise.allSettled(chunks.map(async (chunkText, i) => {
           try {
-            console.log(`[Veritas] Sending LIVE_SCAN for "transcript" (${transcriptText.length} chars)...`);
             const response = await chrome.runtime.sendMessage({
-              type: 'LIVE_SCAN',
-              text: transcriptText,
+              type: 'LIVE_SCAN_DIRECT',
+              text: chunkText,
               url: location.href,
               platform: PLATFORM,
               contentType: 'transcript',
-              hash,
             });
 
             if (response && response.claims && response.claims.length > 0) {
-              console.log(`[Veritas] Adding ${response.claims.length} transcript claim(s) to overlay`);
+              console.log(`[Veritas] Chunk ${i + 1}/${chunks.length}: ${response.claims.length} claim(s)`);
               addClaims(response.claims);
+              allClaims.push(...response.claims);
             } else {
-              console.log('[Veritas] No transcript claims returned');
+              console.log(`[Veritas] Chunk ${i + 1}/${chunks.length}: no claims`);
             }
           } catch (err) {
             if (isContextInvalidated(err)) { teardown(); return; }
-            console.error('[Veritas] Transcript scan error:', err);
+            console.error(`[Veritas] Chunk ${i + 1} error:`, err);
           }
-        } else {
-          console.log('[Veritas] Transcript too short or no fitness content');
+        }));
+
+        // Persist to cache for next visit
+        if (allClaims.length > 0) {
+          await setVideoCache(videoId, allClaims);
+          console.log(`[Veritas] Cached ${allClaims.length} claim(s) for video ${videoId}`);
         }
         return;
       }
@@ -787,8 +906,8 @@
     if (scannedTexts.has(hash)) return;
     scannedTexts.add(hash);
 
-    if (!hasFitnessContent(combined)) {
-      console.log('[Veritas] Combined page text has no fitness content — skipping');
+    if (!hasCheckableContent(combined)) {
+      console.log('[Veritas] Combined page text has no checkable content — skipping');
       return;
     }
 
@@ -863,8 +982,9 @@
   // ── Settings listener ───────────────────────────────────────────────────────
 
   function loadSettings() {
-    chrome.storage.sync.get({ liveScanEnabled: true }, ({ liveScanEnabled }) => {
+    chrome.storage.sync.get({ liveScanEnabled: true, alertSound: 'poke' }, ({ liveScanEnabled, alertSound: sound }) => {
       scanEnabled = liveScanEnabled;
+      alertSound = sound || 'poke';
       if (scanEnabled) {
         debouncedScan();
       } else {
@@ -881,6 +1001,9 @@
       } else {
         debouncedScan();
       }
+    }
+    if (changes.alertSound) {
+      alertSound = changes.alertSound.newValue || 'poke';
     }
   });
 
