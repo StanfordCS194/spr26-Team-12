@@ -56,7 +56,7 @@ def health() -> dict:
             search_provider=config.SEARCH_PROVIDER,
             openai_configured=bool(config.OPENAI_API_KEY),
             search_configured=bool(config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY),
-            transcription_configured=transcription_configured,
+            transcription_configured=bool(config.GROQ_API_KEY or config.OPENAI_API_KEY),
             groq_configured=bool(config.GROQ_API_KEY),
         ).model_dump(),
     }

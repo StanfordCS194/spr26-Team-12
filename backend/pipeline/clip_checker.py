@@ -809,22 +809,16 @@ async def check_claim(claim: ExtractedClaimItem) -> ClaimCheckResult:
 def _score_report(results: List[ClaimCheckResult]) -> int:
     if not results:
         return 50
-    impacts = {
-        "supports": 5,
-        "partially_supports": 2,
-        "mixed": 0,
-        "weak": -4,
-        "contradicts": -8,
-        "insufficient": -2,
+    weights = {
+        "supports": 1.0,
+        "partially_supports": 0.75,
+        "mixed": 0.5,
+        "weak": 0.25,
+        "insufficient": 0.0,
+        "contradicts": 0.0,
     }
-    score = 75
-    for result in results:
-        score += impacts.get(result.agreement.final_direction, 0)
-        if result.claim.risk_level == "high" and result.agreement.final_direction in {"weak", "contradicts"}:
-            score -= 5
-        if result.agreement.agreement_level in {"conclusion_disagreement", "source_disagreement"}:
-            score -= 3
-    return max(0, min(100, score))
+    total = sum(weights.get(r.agreement.final_direction, 0.0) for r in results)
+    return round((total / len(results)) * 100)
 
 
 def _summary(results: List[ClaimCheckResult]) -> str:

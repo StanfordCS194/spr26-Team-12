@@ -653,6 +653,11 @@ export default function App() {
   const [claims, setClaims] = useState([]);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
+  const [roster, setRoster] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterError, setRosterError] = useState('');
+  const [rosterMin, setRosterMin] = useState(0);
+  const [activeProfile, setActiveProfile] = useState(null);
 
   const abortRef = useRef(null);
 
