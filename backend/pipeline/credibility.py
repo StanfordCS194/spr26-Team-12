@@ -38,6 +38,10 @@ _DATA_DIR = Path(config.BASE_DIR) / "data"
 _INFLUENCERS_PATH = _DATA_DIR / "influencers.json"
 _PRODUCTS_PATH = _DATA_DIR / "products.json"
 _LEDGER_PATH = _DATA_DIR / "credibility_ledger.json"
+# Hidden set is intentionally a separate file so the canonical
+# influencers.json (tracked in git, used to seed demos) stays immutable
+# at runtime. DELETE is a soft-hide; reseed clears this set.
+_HIDDEN_PATH = _DATA_DIR / "hidden_influencers.json"
 
 _lock = threading.Lock()
 
@@ -227,9 +231,29 @@ def _direction_breakdown(entries: List[dict]) -> Dict[str, int]:
     return out
 
 
-def list_influencers() -> List[dict]:
-    """Return all influencers with current aggregated scores."""
+def _load_hidden() -> set:
+    data = _load_json(_HIDDEN_PATH)
+    if isinstance(data, list):
+        return set(data)
+    return set()
+
+
+def _save_hidden(slugs: set) -> None:
+    _HIDDEN_PATH.write_text(json.dumps(sorted(slugs), indent=2), encoding="utf-8")
+
+
+def list_influencers(min_verified: int = 0) -> List[dict]:
+    """Return all influencers with current aggregated scores.
+
+    Args:
+        min_verified: only return influencers whose `claims_checked`
+            (ledger entries attributed to them) is >= this value. Filtering
+            happens server-side so the threshold semantics live in one place
+            and the wire payload shrinks for clients that only care about
+            "verified" creators.
+    """
     idx = _influencer_index()
+    hidden = _load_hidden()
     ledger = _ensure_ledger()
     grouped: Dict[str, List[dict]] = {}
     for e in ledger:
@@ -238,7 +262,11 @@ def list_influencers() -> List[dict]:
             grouped.setdefault(s, []).append(e)
     out: List[dict] = []
     for slug, inf in idx.items():
+        if slug in hidden:
+            continue
         entries = grouped.get(slug, [])
+        if min_verified > 0 and len(entries) < min_verified:
+            continue
         score = _score_from_entries(inf.get("baseline_score", 70), entries)
         out.append(
             {
@@ -256,6 +284,40 @@ def list_influencers() -> List[dict]:
         )
     out.sort(key=lambda x: -x["credibility_score"])
     return out
+
+
+def hide_influencer(slug: str) -> bool:
+    """Soft-delete an influencer from listings. Returns True if the slug
+    is known (and is now hidden), False if the slug does not exist.
+
+    Soft-hide rather than hard-delete because influencers.json is the
+    canonical demo dataset committed to the repo; mutating it at runtime
+    would dirty the working tree and break reproducible demos. Reseeding
+    clears the hidden set, making this fully reversible.
+    """
+    if slug not in _influencer_index():
+        return False
+    with _lock:
+        hidden = _load_hidden()
+        hidden.add(slug)
+        _save_hidden(hidden)
+    return True
+
+
+def reseed_ledger() -> int:
+    """Reset the credibility ledger to the canonical seed in
+    influencers.json#seed_ledger and clear any soft-hidden slugs.
+
+    Returns the number of ledger entries after reseeding. Intended for
+    demos / TA review so the leaderboard returns to a known state on
+    demand without manual file edits.
+    """
+    seed_src = _load_json(_INFLUENCERS_PATH) or {}
+    seed = list(seed_src.get("seed_ledger") or [])
+    with _lock:
+        _save_ledger(seed)
+        _save_hidden(set())
+    return len(seed)
 
 
 def get_influencer(slug: str) -> Optional[dict]:
