@@ -46,7 +46,7 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict:
     transcription_configured = bool(config.OPENAI_API_KEY or config.GROQ_API_KEY)
-    return {
+    payload: dict = {
         "ok": True,
         "demo_mode": config.DEMO_MODE,
         "providers": ProviderStatus(
@@ -60,6 +60,9 @@ def health() -> dict:
             groq_configured=bool(config.GROQ_API_KEY),
         ).model_dump(),
     }
+    if config.PUBLIC_WEB_APP_URL:
+        payload["web_app_url"] = config.PUBLIC_WEB_APP_URL
+    return payload
 
 
 # --- Pre-processor endpoints (used by the frontend before /extract) ---

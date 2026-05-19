@@ -66,8 +66,8 @@ Click the **⚙ gear icon** in the popup header (or go to **chrome://extensions 
 
 | Setting | Default | Description |
 |---|---|---|
-| Backend URL | `http://localhost:8000` | URL of the FastAPI backend. Update if you deploy to a server. |
-| Frontend URL | `http://localhost:5173` | URL of the React web app. Used by the "Open full app" button. |
+| Backend URL | `https://veritas-api-ka3y.onrender.com` | Must match `frontend/vercel.json` so the extension and website use the same API. |
+| Frontend URL | `https://veritas-ruby.vercel.app` | URL of the React web app. Used by the "Open full app" button. |
 
 Use the **Test connection** button to verify the backend is reachable before fact-checking. It hits `/api/health` and shows whether the backend is in demo mode or live mode.
 
@@ -133,7 +133,7 @@ If you host the FastAPI backend on a public server (e.g., Railway, Render, Fly.i
 
 1. Open the extension **Settings** page
 2. Update **Backend URL** to your server's URL (e.g., `https://veritas-api.example.com`)
-3. Update **Frontend URL** to your deployed React app URL
+3. Update **Frontend URL** if yours differs from the default production URL (`https://veritas-ruby.vercel.app`).
 4. In `manifest.json`, add your server to `host_permissions`:
 
 ```json

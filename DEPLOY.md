@@ -155,9 +155,14 @@ and set `DEMO_MODE=false`. Render redeploys automatically.
 
 ### Chrome extension
 
-The extension hardcodes `http://localhost:8000`. To point it at production,
-edit `chrome-extension/popup.js` (search for the API base URL constant),
-rebuild the icons if needed (`node generate-icons.mjs`), and re-zip the folder.
+Load **Load unpacked** from `chrome-extension/` (see `chrome-extension/README.md`).
+Production API is the default backend; `manifest.json` includes
+`https://veritas-api.onrender.com/*` in `host_permissions`.
+
+After you have a public Vercel URL from §3, add **`PUBLIC_WEB_APP_URL`** on Render
+(same value, no trailing slash). `/api/health` then includes `web_app_url`, so
+the extension can open the full app and **Test connection** in Settings can
+fill the frontend URL when it is still localhost.
 
 ---
 

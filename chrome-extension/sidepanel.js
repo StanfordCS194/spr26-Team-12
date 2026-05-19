@@ -50,8 +50,8 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
 // ── Settings ───────────────────────────────────────────────────────────────
 async function getBase() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get({ backendUrl: 'http://localhost:8000' }, ({ backendUrl }) => {
-      resolve((backendUrl || 'http://localhost:8000').replace(/\/$/, ''));
+    chrome.storage.sync.get({ backendUrl: VERITAS_DEFAULT_BACKEND }, ({ backendUrl }) => {
+      resolve((backendUrl || VERITAS_DEFAULT_BACKEND).replace(/\/$/, ''));
     });
   });
 }

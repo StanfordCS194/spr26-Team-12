@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Veritas: Ending Misinformation",
+  "name": "Veritas — Fitness Bro Fact Checker",
   "version": "0.2.5",
-  "description": "Live fact-check warnings on YouTube, Twitter/X, and TikTok. Highlight any claim and verify it instantly.",
+  "description": "Live fact-check warnings for fitness claims on YouTube, Twitter/X, and TikTok. Highlight any health claim and verify it instantly.",
   "permissions": [
     "storage",
     "contextMenus",
