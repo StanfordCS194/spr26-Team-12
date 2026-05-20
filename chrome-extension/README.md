@@ -10,10 +10,11 @@ The extension talks to the same Veritas FastAPI backend as the web app. No separ
 
 ### 1. Start the Veritas backend
 
+From the **repository root** (parent of `backend/` and `chrome-extension/`):
+
 ```bash
-cd backend
-source venv/bin/activate      # Windows: venv\Scripts\activate
-uvicorn main:app --reload     # starts at http://localhost:8000
+source backend/venv/bin/activate   # Windows: backend\venv\Scripts\activate
+uvicorn backend.main:app --reload  # matches backend/main.py docstring — package imports need this module path
 ```
 
 ### 2. Load the extension in Chrome
@@ -84,7 +85,9 @@ Use the **Test connection** button to verify the backend is reachable before fac
 | `sidePanel` | Enables the Live Fact-Check side panel that stays open while you watch a video |
 | `http://localhost/*` | Allows the popup and side panel to call the local Veritas backend API |
 
-The extension does **not** read page content automatically or send any data anywhere other than the backend URL you configure.
+The popup and recording flow only send data when you initiate an action.
+
+On **YouTube, X/Twitter, and TikTok**, the bundled `live_scanner.js` content script scans visible page text/captions for fitness claims — those requests still go **only** to the backend URL you configure in settings.
 
 ---
 
