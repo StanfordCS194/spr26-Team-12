@@ -69,15 +69,18 @@ function hasSystemVerdict(item) {
 }
 
 function directionLabel(direction) {
+  // Plain-English verdict labels modeled after Snopes / PolitiFact / health
+  // misinfo labels. Replaces the old 0-100 score, which users read as a
+  // percentage of truth and found misleading.
   const labels = {
-    supports: 'Supported',
-    partially_supports: 'Partly supported',
-    mixed: 'Mixed',
-    weak: 'Weak evidence',
-    contradicts: 'Contradicted',
-    insufficient: 'Insufficient evidence',
+    supports: 'TRUE',
+    partially_supports: 'MOSTLY TRUE',
+    mixed: 'MIXED',
+    weak: 'MISLEADING',
+    contradicts: 'FALSE',
+    insufficient: 'UNVERIFIED',
   };
-  return labels[direction] || direction.replaceAll('_', ' ');
+  return labels[direction] || direction.replaceAll('_', ' ').toUpperCase();
 }
 
 function EvidenceBadge({ direction }) {
@@ -217,32 +220,45 @@ function RecommendationsSection({ item }) {
   );
 }
 function ReportView({ report }) {
-  const verdictCount = report.claims.filter(hasSystemVerdict).length;
-  const reviewCount = report.claims.length - verdictCount;
+  const claims = report.claims;
+  // Single-claim case is the primary UX target: show the verdict as the
+  // headline, with a source count as the only number on screen. Multi-claim
+  // reports get a verdict tally instead of a single aggregate score.
+  const single = claims.length === 1 && hasSystemVerdict(claims[0]) ? claims[0] : null;
+  const totalSources = claims.reduce((acc, c) => acc + (c.sources?.length || 0), 0);
+  const tally = {};
+  for (const c of claims) {
+    if (hasSystemVerdict(c)) {
+      const d = c.agreement.final_direction;
+      tally[d] = (tally[d] || 0) + 1;
+    }
+  }
   return (
     <div className="report-stack">
       <div className="panel report-hero">
         <div>
-          <div className="label">Clip report</div>
-          <h2>{report.clip_credibility_score}/100 credibility</h2>
-          <p>{report.overall_summary}</p>
-          {reviewCount > 0 && (
-            <p className="muted-note">{reviewCount} claim(s) need more review before Veritas can rate them clearly.</p>
+          <div className="label">Verdict</div>
+          {single ? (
+            <>
+              <h2>
+                <span className={`direction dir-${single.agreement.final_direction}`} style={{ fontSize: '1.6rem', padding: '6px 14px' }}>
+                  {directionLabel(single.agreement.final_direction)}
+                </span>
+              </h2>
+              <p className="muted-note">Based on {single.sources.length} credible source{single.sources.length === 1 ? '' : 's'}.</p>
+            </>
+          ) : (
+            <>
+              <h2>{claims.length} claim{claims.length === 1 ? '' : 's'} checked</h2>
+              <div className="badge-row" style={{ flexWrap: 'wrap', marginTop: 8 }}>
+                {Object.entries(tally).map(([dir, n]) => (
+                  <span key={dir} className={`direction dir-${dir}`}>{directionLabel(dir)}: {n}</span>
+                ))}
+              </div>
+              <p className="muted-note" style={{ marginTop: 8 }}>Based on {totalSources} credible source{totalSources === 1 ? '' : 's'} across {claims.length} claims.</p>
+            </>
           )}
-          <details className="score-explainer">
-            <summary>How is this score calculated?</summary>
-            <p>
-              Veritas starts every clip at <strong>75/100</strong> and adjusts based on how the
-              evidence lands for each claim. Claims that are clearly <em>supported</em> raise the score,
-              while <em>weak</em>, <em>contradicted</em>, or <em>insufficient</em> claims lower it.
-              High-risk claims that come back weak or contradicted carry an extra penalty,
-              and claims where the evidence review couldn&rsquo;t reach a clear answer take a smaller deduction.
-              The score is capped between 0 and 100.
-            </p>
-            <p className="muted-note" style={{ marginTop: 6 }}>
-              Think of it as &ldquo;how trustworthy was this clip overall&rdquo; &mdash; not a medical rating.
-            </p>
-          </details>
+          <p>{report.overall_summary}</p>
         </div>
         {report.needs_human_review && <span className="review-flag">Needs review</span>}
       </div>
