@@ -82,7 +82,7 @@ function cleanCache() {
 async function callQuickScan(text, url, platform, contentType) {
   const base = await getBackendUrl();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 50000);
 
   try {
     const body = { text: text.slice(0, 5000), url, platform };
@@ -135,6 +135,17 @@ async function processQueue() {
 // ── Message handler ───────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Direct scan — bypasses rate-limit queue for parallel transcript chunks
+  if (message.type === 'LIVE_SCAN_DIRECT') {
+    const { text, url, platform, contentType } = message;
+    callQuickScan(text, url, platform, contentType).then(result => {
+      sendResponse({ claims: result.claims || [] });
+    }).catch(() => {
+      sendResponse({ claims: [] });
+    });
+    return true;
+  }
+
   if (message.type === 'LIVE_SCAN') {
     const { text, url, platform, hash, contentType } = message;
 
@@ -156,6 +167,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     processQueue();
     return true; // keep message channel open for async response
+  }
+
+  if (message.type === 'FETCH_TRANSCRIPT') {
+    const { videoId } = message;
+    (async () => {
+      const base = await getBackendUrl();
+      try {
+        const res = await fetch(`${base}/api/transcript/${videoId}`, {
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!res.ok) {
+          const detail = await res.text().catch(() => '');
+          sendResponse({ error: `HTTP ${res.status}`, segments: [] });
+          return;
+        }
+        const data = await res.json();
+        sendResponse(data);
+      } catch (err) {
+        sendResponse({ error: err.message, segments: [] });
+      }
+    })();
+    return true;
   }
 
   if (message.type === 'LIVE_DEEP_CHECK') {

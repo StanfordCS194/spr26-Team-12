@@ -32,6 +32,15 @@ ClaimCategory = Literal[
     "injury",
     "product_marketing",
     "medical_boundary",
+    # Politics & current events
+    "politics",
+    "economics",
+    "environment",
+    "legal",
+    "statistics",
+    "history",
+    "science",
+    "conspiracy",
     "other",
 ]
 RiskLevel = Literal["low", "medium", "high"]
@@ -69,7 +78,7 @@ class VerdictRequest(BaseModel):
 
 
 class ExtractClaimsRequest(BaseModel):
-    transcript: str = Field(..., max_length=12000)
+    transcript: str = Field(...)
     source: SourceMode = "text"
 
 
@@ -143,7 +152,7 @@ class ClaimCheckResult(BaseModel):
 
 
 class ClipReportRequest(BaseModel):
-    transcript: str = Field(..., max_length=12000)
+    transcript: str = Field(...)
     claims: List[ExtractedClaimItem]
     source: SourceMode = "text"
     creator_name: Optional[str] = None
@@ -155,6 +164,7 @@ class ClipReportResponse(BaseModel):
     transcript: str
     source: SourceMode
     creator_name: Optional[str] = None
+    creator_slug: Optional[str] = None
     brand_name: Optional[str] = None
     claims: List[ClaimCheckResult]
     overall_summary: str
@@ -207,7 +217,7 @@ class ProviderStatus(BaseModel):
     search_provider: str
     openai_configured: bool
     search_configured: bool
-    transcription_configured: bool = False
+    transcription_configured: bool
     groq_configured: bool = False
 
 
@@ -235,3 +245,17 @@ class QuickScanResponse(BaseModel):
     claims: List[QuickScanClaim]
     scan_time_ms: int
     flagged: bool = False
+
+
+# --- YouTube transcript (SerpAPI proxy) ---
+class TranscriptSegment(BaseModel):
+    start_ms: int
+    end_ms: int
+    snippet: str
+    start_time_text: str = ""
+
+
+class TranscriptResponse(BaseModel):
+    video_id: str
+    segments: List[TranscriptSegment]
+    fetch_time_ms: int = 0

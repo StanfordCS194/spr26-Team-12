@@ -10,6 +10,8 @@ const testStatus     = document.getElementById('testStatus');
 const clearCacheBtn  = document.getElementById('clearCacheBtn');
 const cacheStatus    = document.getElementById('cacheStatus');
 const scanStats      = document.getElementById('scanStats');
+const alertSoundSel  = document.getElementById('alertSound');
+const previewSoundBtn = document.getElementById('previewSoundBtn');
 
 // Load saved values
 chrome.storage.sync.get(
@@ -17,11 +19,13 @@ chrome.storage.sync.get(
     backendUrl: VERITAS_DEFAULT_BACKEND,
     frontendUrl: VERITAS_DEFAULT_FRONTEND,
     liveScanEnabled: true,
+    alertSound: 'poke',
   },
-  ({ backendUrl, frontendUrl, liveScanEnabled }) => {
+  ({ backendUrl, frontendUrl, liveScanEnabled, alertSound }) => {
     backendInput.value  = backendUrl;
     frontendInput.value = frontendUrl;
     liveScanToggle.checked = liveScanEnabled;
+    alertSoundSel.value = alertSound;
   }
 );
 
@@ -30,7 +34,8 @@ saveBtn.addEventListener('click', () => {
   const backendUrl  = backendInput.value.trim()  || VERITAS_DEFAULT_BACKEND;
   const frontendUrl = frontendInput.value.trim() || VERITAS_DEFAULT_FRONTEND;
   const liveScanEnabled = liveScanToggle.checked;
-  chrome.storage.sync.set({ backendUrl, frontendUrl, liveScanEnabled }, () => {
+  const alertSound = alertSoundSel.value;
+  chrome.storage.sync.set({ backendUrl, frontendUrl, liveScanEnabled, alertSound }, () => {
     saveStatus.textContent = 'Saved!';
     setTimeout(() => { saveStatus.textContent = ''; }, 2000);
   });
@@ -84,6 +89,20 @@ clearCacheBtn.addEventListener('click', () => {
       cacheStatus.style.color = '';
     }, 2000);
   });
+});
+
+// Alert sound (instant save on change)
+alertSoundSel.addEventListener('change', () => {
+  chrome.storage.sync.set({ alertSound: alertSoundSel.value });
+});
+
+// Preview sound
+previewSoundBtn.addEventListener('click', () => {
+  const choice = alertSoundSel.value;
+  if (choice === 'off') return;
+  const audio = new Audio(`sounds/${choice}.mp3`);
+  audio.volume = 0.5;
+  audio.play().catch(() => {});
 });
 
 // Show scan stats

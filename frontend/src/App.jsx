@@ -11,21 +11,6 @@ function detectPlatform(url) {
   return null;
 }
 
-/** Vercel/Render often return HTML or plain text on 5xx; avoid response.json() on errors. */
-async function readApiError(response) {
-  const text = await response.text();
-  try {
-    const j = JSON.parse(text);
-    if (j && typeof j === 'object' && j.detail != null) return String(j.detail);
-    if (j && typeof j === 'object' && j.message != null) return String(j.message);
-  } catch {
-    /* not JSON */
-  }
-  const trimmed = text.trim();
-  if (trimmed) return trimmed.slice(0, 400);
-  return `Request failed (HTTP ${response.status})`;
-}
-
 function useTheme() {
   const [theme, setTheme] = useState(
     () => document.documentElement.dataset.theme || 'light'
@@ -47,19 +32,6 @@ function ThemeToggle({ theme, setTheme }) {
       aria-label={`Switch to ${next} mode`}
     >
       {theme === 'dark' ? 'L' : 'D'}
-    </button>
-  );
-}
-
-function RosterToggle({ onClick, active }) {
-  return (
-    <button
-      className={`icon-btn ${active ? 'is-active' : ''}`}
-      onClick={onClick}
-      title={active ? 'Back to fact-checker' : 'View credibility leaderboard'}
-      aria-label={active ? 'Back to fact-checker' : 'View credibility leaderboard'}
-    >
-      {active ? '←' : 'R'}
     </button>
   );
 }
@@ -92,169 +64,23 @@ function ProgressList({ stage }) {
   );
 }
 
-/* ============================================================
-   Feature 2 — Credibility leaderboard
-   ============================================================ */
-const VERDICT_BUCKETS = [
-  { key: 'true', label: 'True', cls: 'true' },
-  { key: 'mostly_true', label: 'Mostly true', cls: 'mostly_true' },
-  { key: 'mixed', label: 'Mixed', cls: 'mixed' },
-  { key: 'weak', label: 'Weak', cls: 'weak' },
-  { key: 'false', label: 'False', cls: 'false' },
-  { key: 'unverified', label: 'Unverified', cls: 'unverified' },
-];
-
-function GradeBadge({ grade, score, size = 'sm' }) {
-  const display = score == null ? '—' : `${score}%`;
-  return (
-    <div className={`grade-badge grade-${grade.toLowerCase().replace('/', '')} grade-${size}`}>
-      <div className="grade-letter">{grade}</div>
-      <div className="grade-score">{display}</div>
-    </div>
-  );
-}
-
-function RosterListView({ items, loading, onSelect, onSeed, error, minVerified, setMinVerified }) {
-  return (
-    <div className="panel">
-      <div className="review-head">
-        <div>
-          <div className="label">Credibility leaderboard</div>
-          <h2>Influencers ranked by claim accuracy</h2>
-        </div>
-        <span className="pill">{items.length} tracked</span>
-      </div>
-
-      <div className="row" style={{ marginTop: 4 }}>
-        <label className="muted-note" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          Min verified claims:
-          <input
-            type="number"
-            min="0"
-            value={minVerified}
-            onChange={(e) => setMinVerified(Math.max(0, Number(e.target.value) || 0))}
-            style={{ width: 64, padding: '4px 8px' }}
-          />
-        </label>
-        <span className="pill">supports +1 · partial +0.5 · mixed 0 · weak −0.5 · contradicts −1</span>
-      </div>
-
-      {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
-      {loading && !items.length && <p className="muted-note" style={{ marginTop: 16 }}>Loading…</p>}
-
-      {!loading && !items.length && (
-        <div style={{ marginTop: 18 }}>
-          <p className="muted-note">
-            No influencers tracked yet. Run a clip-report with a creator name and Veritas
-            will start building their credibility profile.
-          </p>
-          <div className="row">
-            <button className="primary" onClick={onSeed}>Load demo influencers</button>
-          </div>
-        </div>
-      )}
-
-      <ul className="roster-list">
-        {items.map((profile, idx) => {
-          const c = profile.credibility;
-          return (
-            <li key={profile.slug}>
-              <button className="roster-row" onClick={() => onSelect(profile.slug)}>
-                <span className="rank">#{idx + 1}</span>
-                <div className="roster-name">
-                  <strong>{profile.name}</strong>
-                  <span className="muted-note">
-                    {c.verified_claims} verified · {c.total_claims} total
-                    {c.needs_review_claims > 0 && ` · ${c.needs_review_claims} need review`}
-                  </span>
-                </div>
-                <GradeBadge grade={c.grade} score={c.score} />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function RosterDetailView({ detail, onBack, onDelete }) {
-  const c = detail.credibility;
-  const buckets = c.buckets || {};
-  return (
-    <>
-      <div className="panel">
-        <button className="ghost" onClick={onBack} style={{ marginBottom: 14 }}>← Back to leaderboard</button>
-        <div className="profile-head">
-          <div>
-            <div className="label">Influencer profile</div>
-            <h2 style={{ margin: '2px 0 6px' }}>{detail.name}</h2>
-            <p className="muted-note" style={{ margin: 0 }}>
-              First tracked {detail.first_seen ? new Date(detail.first_seen).toLocaleDateString() : '—'}
-              {c.last_checked_at && ` · last clip ${new Date(c.last_checked_at).toLocaleDateString()}`}
-            </p>
-          </div>
-          <GradeBadge grade={c.grade} score={c.score} size="lg" />
-        </div>
-
-        <div className="bucket-grid">
-          {VERDICT_BUCKETS.map((b) => (
-            <div key={b.key} className={`bucket bucket-${b.cls}`}>
-              <div className="bucket-num">{buckets[b.key] || 0}</div>
-              <div className="bucket-label">{b.label}</div>
-            </div>
-          ))}
-        </div>
-        <p className="muted-note" style={{ textAlign: 'center', marginTop: 4 }}>
-          Score = (Σ weights + verified) / (2 × verified) × 100, with insufficient claims excluded.
-        </p>
-      </div>
-
-      <div className="panel">
-        <div className="evidence-h" style={{ marginTop: 0 }}>Claim history ({detail.claim_records.length})</div>
-        {detail.claim_records.length === 0 && (
-          <p className="muted-note">No claims have been logged for this influencer yet.</p>
-        )}
-        {detail.claim_records.map((rec) => (
-          <div className="claim-history-row" key={`${rec.report_id}-${rec.claim_id}-${rec.checked_at}`}>
-            <span className={`direction dir-${rec.final_direction}`}>
-              {directionLabel(rec.final_direction)}
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="claim-history-text">{rec.claim_text}</div>
-              <div className="muted-note">
-                {rec.category.replaceAll('_', ' ')} · {rec.risk_level} risk · confidence {rec.confidence}
-                {rec.source_domain && ` · ${rec.source_domain}`}
-                {rec.checked_at && ` · ${new Date(rec.checked_at).toLocaleDateString()}`}
-                {rec.needs_review && ' · needs review'}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <button className="ghost" onClick={onBack}>← Back to leaderboard</button>
-        <button className="ghost" onClick={onDelete}>Remove influencer</button>
-      </div>
-    </>
-  );
-}
-
 function hasSystemVerdict(item) {
   return ['strong_agreement', 'partial_agreement'].includes(item.agreement.agreement_level);
 }
 
 function directionLabel(direction) {
+  // Plain-English verdict labels modeled after Snopes / PolitiFact / health
+  // misinfo labels. Replaces the old 0-100 score, which users read as a
+  // percentage of truth and found misleading.
   const labels = {
-    supports: 'Supported',
-    partially_supports: 'Partly supported',
-    mixed: 'Mixed',
-    weak: 'Weak evidence',
-    contradicts: 'Contradicted',
-    insufficient: 'Insufficient evidence',
+    supports: 'TRUE',
+    partially_supports: 'MOSTLY TRUE',
+    mixed: 'MIXED',
+    weak: 'MISLEADING',
+    contradicts: 'FALSE',
+    insufficient: 'UNVERIFIED',
   };
-  return labels[direction] || direction.replaceAll('_', ' ');
+  return labels[direction] || direction.replaceAll('_', ' ').toUpperCase();
 }
 
 function EvidenceBadge({ direction }) {
@@ -394,32 +220,45 @@ function RecommendationsSection({ item }) {
   );
 }
 function ReportView({ report }) {
-  const verdictCount = report.claims.filter(hasSystemVerdict).length;
-  const reviewCount = report.claims.length - verdictCount;
+  const claims = report.claims;
+  // Single-claim case is the primary UX target: show the verdict as the
+  // headline, with a source count as the only number on screen. Multi-claim
+  // reports get a verdict tally instead of a single aggregate score.
+  const single = claims.length === 1 && hasSystemVerdict(claims[0]) ? claims[0] : null;
+  const totalSources = claims.reduce((acc, c) => acc + (c.sources?.length || 0), 0);
+  const tally = {};
+  for (const c of claims) {
+    if (hasSystemVerdict(c)) {
+      const d = c.agreement.final_direction;
+      tally[d] = (tally[d] || 0) + 1;
+    }
+  }
   return (
     <div className="report-stack">
       <div className="panel report-hero">
         <div>
-          <div className="label">Clip report</div>
-          <h2>{report.clip_credibility_score}/100 credibility</h2>
-          <p>{report.overall_summary}</p>
-          {reviewCount > 0 && (
-            <p className="muted-note">{reviewCount} claim(s) need more review before Veritas can rate them clearly.</p>
+          <div className="label">Verdict</div>
+          {single ? (
+            <>
+              <h2>
+                <span className={`direction dir-${single.agreement.final_direction}`} style={{ fontSize: '1.6rem', padding: '6px 14px' }}>
+                  {directionLabel(single.agreement.final_direction)}
+                </span>
+              </h2>
+              <p className="muted-note">Based on {single.sources.length} credible source{single.sources.length === 1 ? '' : 's'}.</p>
+            </>
+          ) : (
+            <>
+              <h2>{claims.length} claim{claims.length === 1 ? '' : 's'} checked</h2>
+              <div className="badge-row" style={{ flexWrap: 'wrap', marginTop: 8 }}>
+                {Object.entries(tally).map(([dir, n]) => (
+                  <span key={dir} className={`direction dir-${dir}`}>{directionLabel(dir)}: {n}</span>
+                ))}
+              </div>
+              <p className="muted-note" style={{ marginTop: 8 }}>Based on {totalSources} credible source{totalSources === 1 ? '' : 's'} across {claims.length} claims.</p>
+            </>
           )}
-          <details className="score-explainer">
-            <summary>How is this score calculated?</summary>
-            <p>
-              Veritas starts every clip at <strong>75/100</strong> and adjusts based on how the
-              evidence lands for each claim. Claims that are clearly <em>supported</em> raise the score,
-              while <em>weak</em>, <em>contradicted</em>, or <em>insufficient</em> claims lower it.
-              High-risk claims that come back weak or contradicted carry an extra penalty,
-              and claims where the evidence review couldn&rsquo;t reach a clear answer take a smaller deduction.
-              The score is capped between 0 and 100.
-            </p>
-            <p className="muted-note" style={{ marginTop: 6 }}>
-              Think of it as &ldquo;how trustworthy was this clip overall&rdquo; &mdash; not a medical rating.
-            </p>
-          </details>
+          <p>{report.overall_summary}</p>
         </div>
         {report.needs_human_review && <span className="review-flag">Needs review</span>}
       </div>
@@ -488,9 +327,8 @@ function directionDot(direction) {
   return map[direction] || '·';
 }
 
-function InfluencersView() {
+function InfluencersView({ activeSlug, setActiveSlug }) {
   const [list, setList] = useState(null);
-  const [active, setActive] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -503,8 +341,8 @@ function InfluencersView() {
   if (error) return <div className="panel"><div className="error">{error}</div></div>;
   if (!list) return <div className="panel">Loading influencers…</div>;
 
-  if (active) {
-    return <InfluencerDetail slug={active} onBack={() => setActive(null)} />;
+  if (activeSlug) {
+    return <InfluencerDetail slug={activeSlug} onBack={() => setActiveSlug(null)} />;
   }
 
   return (
@@ -522,7 +360,7 @@ function InfluencersView() {
       </p>
       <div className="influencer-grid">
         {list.map((inf) => (
-          <button key={inf.slug} className="influencer-card" onClick={() => setActive(inf.slug)}>
+          <button key={inf.slug} className="influencer-card" onClick={() => setActiveSlug(inf.slug)}>
             <div className="influencer-head">
               <div
                 className="avatar"
@@ -816,6 +654,7 @@ function ProductDetail({ productId, onBack }) {
 export default function App() {
   const [theme, setTheme] = useTheme();
   const [view, setView] = useState('factcheck'); // 'factcheck' | 'influencers' | 'products'
+  const [activeInfluencerSlug, setActiveInfluencerSlug] = useState(null);
   const [tab, setTab] = useState('text');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -830,10 +669,6 @@ export default function App() {
   const [claims, setClaims] = useState([]);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
-
-  // Feature 2: state for the (now-unused) original roster leaderboard.
-  // The top-nav added by Features 2+3 uses 'view' declared above with values
-  // 'factcheck' | 'influencers' | 'products' instead.
   const [roster, setRoster] = useState([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState('');
@@ -841,24 +676,6 @@ export default function App() {
   const [activeProfile, setActiveProfile] = useState(null);
 
   const abortRef = useRef(null);
-
-  async function loadRoster() {
-    setRosterLoading(true);
-    setRosterError('');
-    try {
-      const response = await fetch(`/api/influencers?min_verified=${rosterMin}`);
-      if (!response.ok) throw new Error(await readApiError(response));
-      setRoster(await response.json());
-    } catch (err) {
-      setRosterError(err.message || String(err));
-    } finally {
-      setRosterLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (view === 'roster') loadRoster();
-  }, [view, rosterMin]);
 
   // Pick up text handed off from the Chrome extension's "Open full app" button.
   // The extension forwards ?text=...&creator=...&source=... (and optionally
@@ -881,42 +698,6 @@ export default function App() {
       }
     } catch {}
   }, []);
-
-  async function openProfile(slug) {
-    setRosterError('');
-    try {
-      const response = await fetch(`/api/influencers/${slug}`);
-      if (!response.ok) throw new Error(await readApiError(response));
-      setActiveProfile(await response.json());
-      setView('roster-detail');
-    } catch (err) {
-      setRosterError(err.message || String(err));
-    }
-  }
-
-  async function seedRoster() {
-    try {
-      await fetch('/api/influencers/seed', { method: 'POST' });
-      loadRoster();
-    } catch (err) {
-      setRosterError(err.message || String(err));
-    }
-  }
-
-  async function deleteActiveProfile() {
-    if (!activeProfile) return;
-    if (!confirm(`Remove ${activeProfile.name} from the leaderboard?`)) return;
-    try {
-      const response = await fetch(`/api/influencers/${activeProfile.slug}`, { method: 'DELETE' });
-      if (!response.ok && response.status !== 204) {
-        throw new Error(await readApiError(response));
-      }
-      setActiveProfile(null);
-      setView('roster');
-    } catch (err) {
-      setRosterError(err.message || String(err));
-    }
-  }
 
   useEffect(() => {
     function onPaste(e) {
@@ -941,7 +722,7 @@ export default function App() {
         body: JSON.stringify({ text }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error(await readApiError(response));
+      if (!response.ok) throw new Error((await response.json()).detail || 'Text processing failed');
       return (await response.json()).text;
     }
     if (tab === 'link') {
@@ -951,7 +732,7 @@ export default function App() {
         body: JSON.stringify({ url }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error(await readApiError(response));
+      if (!response.ok) throw new Error((await response.json()).detail || 'Link processing failed');
       return (await response.json()).text;
     }
     if (tab === 'screenshot') {
@@ -963,7 +744,7 @@ export default function App() {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error(await readApiError(response));
+      if (!response.ok) throw new Error((await response.json()).detail || 'Screenshot processing failed');
       return (await response.json()).text;
     }
     if (tab === 'audio') {
@@ -975,7 +756,7 @@ export default function App() {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error(await readApiError(response));
+      if (!response.ok) throw new Error((await response.json()).detail || 'Audio transcription failed');
       return (await response.json()).text;
     }
     throw new Error('Unknown input type.');
@@ -994,7 +775,7 @@ export default function App() {
         body: JSON.stringify({ transcript: processed, source: tab }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error(await readApiError(response));
+      if (!response.ok) throw new Error((await response.json()).detail || 'Claim extraction failed');
       const payload = await response.json();
       setClaims(payload.claims || []);
       setState('review');
@@ -1022,7 +803,7 @@ export default function App() {
         }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error(await readApiError(response));
+      if (!response.ok) throw new Error((await response.json()).detail || 'Report generation failed');
       setReport(await response.json());
       setState('report');
     } catch (err) {
@@ -1067,14 +848,22 @@ export default function App() {
           <button
             key={v.id}
             className={`topnav-btn ${view === v.id ? 'active' : ''}`}
-            onClick={() => setView(v.id)}
+            onClick={() => {
+              if (v.id === 'influencers') setActiveInfluencerSlug(null);
+              setView(v.id);
+            }}
           >
             {v.label}
           </button>
         ))}
       </nav>
 
-      {view === 'influencers' && <InfluencersView />}
+      {view === 'influencers' && (
+        <InfluencersView
+          activeSlug={activeInfluencerSlug}
+          setActiveSlug={setActiveInfluencerSlug}
+        />
+      )}
       {view === 'products' && <ProductsView />}
 
       {view === 'factcheck' && state === 'idle' && (
@@ -1091,11 +880,68 @@ export default function App() {
             ))}
           </div>
 
-          {tab === 'link' ? (
+          <div className="profile-row">
+            <input
+              type="text"
+              placeholder="Influencer handle (optional)"
+              value={creatorName}
+              onChange={(e) => setCreatorName(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Brand name (optional)"
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+            />
+          </div>
+
+          {tab === 'text' && (
+            <>
+              <textarea
+                placeholder="Paste a transcript, caption, or influencer rant..."
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={12000}
+              />
+              <div className="row">
+                <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
+                <span className="pill">{text.length}/12000</span>
+              </div>
+            </>
+          )}
+
+          {tab === 'audio' && (
+            <>
+              <label
+                className={`dropzone ${drag ? 'drag' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={(e) => {
+                  e.preventDefault(); setDrag(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setAudioFile(file);
+                }}
+              >
+                <input
+                  type="file"
+                  accept="audio/*,video/mp4,video/quicktime,video/webm"
+                  style={{ display: 'none' }}
+                  onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                />
+                {audioFile ? <span>{audioFile.name} - click to replace</span> : <span>Drop an audio/video clip or click to choose one</span>}
+              </label>
+              <div className="row">
+                <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Transcribe and extract claims</button>
+                <span className="pill">Audio transcription</span>
+              </div>
+            </>
+          )}
+
+          {tab === 'link' && (
             <>
               <input
                 type="url"
-                placeholder="Paste video or article URL (YouTube, TikTok, …)"
+                placeholder="https://www.tiktok.com/..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
@@ -1103,105 +949,32 @@ export default function App() {
                 <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
                 {platform && <span className="pill">platform: {platform}</span>}
               </div>
-              <div className="profile-row">
-                <input
-                  type="text"
-                  placeholder="@handle (optional, not the URL above)"
-                  value={creatorName}
-                  onChange={(e) => setCreatorName(e.target.value)}
-                />
-                <input
-                  type="text"
-                  placeholder="Brand name (optional)"
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
-                />
-              </div>
             </>
-          ) : (
+          )}
+
+          {tab === 'screenshot' && (
             <>
-              <div className="profile-row">
+              <label
+                className={`dropzone ${drag ? 'drag' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={(e) => {
+                  e.preventDefault(); setDrag(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setImageFile(file);
+                }}
+              >
                 <input
-                  type="text"
-                  placeholder="Influencer handle (optional)"
-                  value={creatorName}
-                  onChange={(e) => setCreatorName(e.target.value)}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                 />
-                <input
-                  type="text"
-                  placeholder="Brand name (optional)"
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
-                />
+                {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
+              </label>
+              <div className="row">
+                <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
               </div>
-
-              {tab === 'text' && (
-                <>
-                  <textarea
-                    placeholder="Paste a transcript, caption, or influencer rant..."
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    maxLength={12000}
-                  />
-                  <div className="row">
-                    <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
-                    <span className="pill">{text.length}/12000</span>
-                  </div>
-                </>
-              )}
-
-              {tab === 'audio' && (
-                <>
-                  <label
-                    className={`dropzone ${drag ? 'drag' : ''}`}
-                    onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-                    onDragLeave={() => setDrag(false)}
-                    onDrop={(e) => {
-                      e.preventDefault(); setDrag(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) setAudioFile(file);
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept="audio/*,video/mp4,video/quicktime,video/webm"
-                      style={{ display: 'none' }}
-                      onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-                    />
-                    {audioFile ? <span>{audioFile.name} - click to replace</span> : <span>Drop an audio/video clip or click to choose one</span>}
-                  </label>
-                  <div className="row">
-                    <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Transcribe and extract claims</button>
-                    <span className="pill">Audio transcription</span>
-                  </div>
-                </>
-              )}
-
-              {tab === 'screenshot' && (
-                <>
-                  <label
-                    className={`dropzone ${drag ? 'drag' : ''}`}
-                    onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-                    onDragLeave={() => setDrag(false)}
-                    onDrop={(e) => {
-                      e.preventDefault(); setDrag(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) setImageFile(file);
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                    />
-                    {imageFile ? <span>{imageFile.name} - click to replace</span> : <span>Drop a screenshot, click to choose, or paste with Cmd+V</span>}
-                  </label>
-                  <div className="row">
-                    <button className="primary" disabled={!canSubmit} onClick={prepareClaims}>Extract claims</button>
-                  </div>
-                </>
-              )}
             </>
           )}
         </div>
@@ -1245,8 +1018,14 @@ export default function App() {
           <div className="row" style={{ justifyContent: 'center', gap: 12 }}>
             <button className="ghost" onClick={reset}>Check another clip</button>
             {report.creator_name && (
-              <button className="ghost" onClick={() => openProfile(report.creator_name.toLowerCase().replace(/^@+/, '').replace(/[^\w\s-]/g, '').replace(/[\s_]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown')}>
-                View {report.creator_name}'s credibility →
+              <button
+                className="ghost"
+                onClick={() => {
+                  if (report.creator_slug) setActiveInfluencerSlug(report.creator_slug);
+                  setView('influencers');
+                }}
+              >
+                View {report.creator_name}{report.creator_name.endsWith('s') ? "'" : "'s"} credibility profile →
               </button>
             )}
           </div>
@@ -1262,7 +1041,7 @@ export default function App() {
         </div>
       )}
 
-      <div className="footer-note">Evidence-checked claim report · sources shown per claim</div>
+      <div className="footer-note">Evidence-checked claim report · sources shown per claim · <a href="https://github.com/StanfordCS194/spr26-Team-12/wiki/Verification-Statistics" target="_blank" rel="noreferrer">Accuracy log</a></div>
     </div>
   );
 }

@@ -35,11 +35,6 @@ _load_dotenv()
 # fallback panels. Set false only when provider API keys are configured.
 DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
-# Public Vite/React URL (e.g. Vercel). Returned in /api/health for the Chrome extension "Open full app".
-# Default matches the team's Vercel production domain; override with PUBLIC_WEB_APP_URL in .env / Render.
-_pub_web = (os.getenv("PUBLIC_WEB_APP_URL") or "").strip().rstrip("/")
-PUBLIC_WEB_APP_URL: str = _pub_web or "https://veritas-ruby.vercel.app"
-
 # Credit-based model providers.
 PRIMARY_LLM_PROVIDER: str = os.getenv("PRIMARY_LLM_PROVIDER", "openai").lower()
 SECONDARY_LLM_PROVIDER: str = os.getenv("SECONDARY_LLM_PROVIDER", "openai").lower()
@@ -53,6 +48,8 @@ OPENAI_WHISPER_MODEL: str = os.getenv("OPENAI_WHISPER_MODEL", "whisper-1")
 # audio transcription. If GROQ_API_KEY is set, the transcriber will prefer
 # Groq over OpenAI unless TRANSCRIPTION_PROVIDER overrides it.
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+GROQ_TEXT_MODEL: str = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
+GROQ_TRANSCRIPTION_MODEL: str = os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo")
 GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3")
 TRANSCRIPTION_PROVIDER: str = os.getenv(
 	"TRANSCRIPTION_PROVIDER",
@@ -61,6 +58,7 @@ TRANSCRIPTION_PROVIDER: str = os.getenv(
 
 TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 BRAVE_SEARCH_API_KEY: str = os.getenv("BRAVE_SEARCH_API_KEY", "")
+SERPAPI_API_KEY: str = os.getenv("SERPAPI_API_KEY", "")
 
 # Active prompt versions.
 EXTRACT_PROMPT: str = os.getenv("EXTRACT_PROMPT", "extract_v1.txt")

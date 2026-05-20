@@ -16,8 +16,6 @@
   bottom: 60px;
   right: 12px;
   width: 340px;
-  max-height: 70vh;
-  overflow-y: auto;
 
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -29,7 +27,97 @@
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
   z-index: 2147483647;
   pointer-events: auto;
+
+  /* Slide-in animation */
+  transform: translateX(0);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s ease;
 }
+
+/* Slide-in from right */
+.veritas-live-overlay.veritas-slide-in {
+  animation: veritasSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes veritasSlideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* Slide-out to right */
+.veritas-live-overlay.veritas-slide-out {
+  animation: veritasSlideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes veritasSlideOut {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(120%); opacity: 0; }
+}
+
+/* ── Alert pill (compact state before timestamps are reached) ─────────── */
+
+.veritas-alert-pill {
+  position: absolute;
+  bottom: 60px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--v-bg);
+  border: 1px solid var(--v-border);
+  border-radius: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+  z-index: 2147483647;
+  pointer-events: auto;
+  cursor: pointer;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--v-text);
+  transition: box-shadow 0.2s, transform 0.2s;
+  animation: veritasFadeIn 0.3s ease forwards;
+
+  --v-bg: #ffffff;
+  --v-border: #e5e5ea;
+  --v-text: #1d1d1f;
+  --v-secondary: #86868b;
+  --v-accent: #0071e3;
+  --v-red: #ff3b30;
+  --v-orange: #ff9500;
+  --v-blue: #007aff;
+}
+
+.veritas-alert-pill:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
+  transform: scale(1.02);
+}
+
+@keyframes veritasFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.veritas-alert-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: veritasPulse 2s ease-in-out infinite;
+}
+.veritas-alert-dot-high   { background: var(--v-red); }
+.veritas-alert-dot-medium { background: var(--v-orange); }
+.veritas-alert-dot-low    { background: var(--v-blue); }
+
+@keyframes veritasPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.veritas-alert-text   { color: var(--v-secondary); font-size: 11.5px; white-space: nowrap; }
+.veritas-alert-logo   { font-weight: 700; font-size: 12px; color: var(--v-text); letter-spacing: -0.01em; }
+.veritas-alert-expand { font-size: 14px; color: var(--v-secondary); margin-left: 2px; }
+
+/* ── Expanded overlay ─────────────────────────────────────────────────── */
 
 /* Header bar */
 .veritas-header {
@@ -84,9 +172,17 @@
 .veritas-severity-medium .veritas-severity-bar { background: var(--v-orange); }
 .veritas-severity-low .veritas-severity-bar { background: var(--v-blue); }
 
-/* Claims list */
+/* Claims list — scrollable */
 .veritas-claims-list {
   padding: 8px 16px 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.veritas-claims-list::-webkit-scrollbar { width: 4px; }
+.veritas-claims-list::-webkit-scrollbar-track { background: transparent; }
+.veritas-claims-list::-webkit-scrollbar-thumb { background: var(--v-border); border-radius: 4px; }
+.veritas-claims-list::-webkit-scrollbar-thumb:hover { background: var(--v-secondary); }
 }
 
 /* Individual claim card */
@@ -96,6 +192,12 @@
   border-radius: 10px;
   background: var(--v-surface);
   border: 1px solid var(--v-border);
+}
+
+/* Highlight the active claim (currently playing timestamp) */
+.veritas-claim.veritas-claim-active {
+  border-color: var(--v-accent);
+  box-shadow: 0 0 0 1px var(--v-accent);
 }
 
 .veritas-claim-header {
@@ -183,7 +285,26 @@
   background: var(--v-accent-hover);
 }
 
-/* No footer — logo is in the header */
+.veritas-show-all-btn {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--v-accent);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.veritas-show-all-btn:hover {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: var(--v-accent);
+}
 
 /* Timestamp badge (click-to-seek) */
 .veritas-timestamp {
@@ -214,13 +335,4 @@
 .veritas-progress-marker:hover {
   opacity: 1 !important;
   transform: scaleX(1.5);
-}
-
-/* Scrollbar styling */
-.veritas-live-overlay::-webkit-scrollbar {
-  width: 4px;
-}
-.veritas-live-overlay::-webkit-scrollbar-thumb {
-  background: var(--v-border);
-  border-radius: 4px;
 }
