@@ -35,11 +35,6 @@ _load_dotenv()
 # fallback panels. Set false only when provider API keys are configured.
 DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
-# Public Vite/React URL (e.g. Vercel). Returned in /api/health for the Chrome extension "Open full app".
-# Default matches the team's Vercel production domain; override with PUBLIC_WEB_APP_URL in .env / Render.
-_pub_web = (os.getenv("PUBLIC_WEB_APP_URL") or "").strip().rstrip("/")
-PUBLIC_WEB_APP_URL: str = _pub_web or "https://veritas-ruby.vercel.app"
-
 # Credit-based model providers.
 PRIMARY_LLM_PROVIDER: str = os.getenv("PRIMARY_LLM_PROVIDER", "openai").lower()
 SECONDARY_LLM_PROVIDER: str = os.getenv("SECONDARY_LLM_PROVIDER", "openai").lower()
