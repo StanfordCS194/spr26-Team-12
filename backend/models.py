@@ -78,7 +78,7 @@ class VerdictRequest(BaseModel):
 
 
 class ExtractClaimsRequest(BaseModel):
-    transcript: str = Field(..., max_length=12000)
+    transcript: str = Field(...)
     source: SourceMode = "text"
 
 
@@ -152,7 +152,7 @@ class ClaimCheckResult(BaseModel):
 
 
 class ClipReportRequest(BaseModel):
-    transcript: str = Field(..., max_length=12000)
+    transcript: str = Field(...)
     claims: List[ExtractedClaimItem]
     source: SourceMode = "text"
     creator_name: Optional[str] = None

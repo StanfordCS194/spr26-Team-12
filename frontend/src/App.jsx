@@ -1025,7 +1025,7 @@ export default function App() {
         </div>
       )}
 
-      <div className="footer-note">Evidence-checked claim report · sources shown per claim</div>
+      <div className="footer-note">Evidence-checked claim report · sources shown per claim · <a href="https://github.com/StanfordCS194/spr26-Team-12/wiki/Verification-Statistics" target="_blank" rel="noreferrer">Accuracy log</a></div>
     </div>
   );
 }
