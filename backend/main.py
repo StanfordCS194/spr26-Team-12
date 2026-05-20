@@ -242,18 +242,8 @@ async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
 
 # --- Feature 2: Influencer credibility -------------------------------------
 @app.get("/api/influencers")
-def list_influencers_endpoint(min_verified: int = 0) -> dict:
-    """List creators with current credibility scores.
-
-    Query params:
-        min_verified: only return creators with at least this many
-            ledger-attributed claims. 0 (default) returns everyone.
-
-    Response shape stays `{"influencers": [...]}` (envelope) for
-    forward compatibility with future pagination / total / filter-echo
-    fields without breaking existing clients.
-    """
-    return {"influencers": credibility.list_influencers(min_verified=max(0, min_verified))}
+def list_influencers_endpoint() -> dict:
+    return {"influencers": credibility.list_influencers()}
 
 
 @app.get("/api/influencers/{slug}")
@@ -262,24 +252,6 @@ def get_influencer_endpoint(slug: str) -> dict:
     if not inf:
         raise HTTPException(status_code=404, detail="influencer not found")
     return inf
-
-
-@app.post("/api/influencers/seed", status_code=200)
-def seed_influencers_endpoint() -> dict:
-    """Reset the credibility ledger to the canonical seed shipped in
-    backend/data/influencers.json and clear any soft-hidden creators.
-    Idempotent (always converges to the same state)."""
-    count = credibility.reseed_ledger()
-    return {"ok": True, "ledger_entries": count}
-
-
-@app.delete("/api/influencers/{slug}", status_code=204)
-def delete_influencer_endpoint(slug: str):
-    """Soft-hide a creator from the leaderboard. Reversed by /seed.
-    Returns 404 if the slug is unknown."""
-    if not credibility.hide_influencer(slug):
-        raise HTTPException(status_code=404, detail="influencer not found")
-    return None
 
 
 # --- Feature 3: Product credibility ----------------------------------------
