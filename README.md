@@ -12,24 +12,15 @@ scores, and brand credibility scores.
 
 ## Current Status
 
-This repo currently contains the earlier supplement-claim checker plus the
-first cleanup for the new pivot.
+Veritas is a deployed MVP for the CS194 team project.
 
 What works now:
 
-- React/Vite UI with text, audio, link, and screenshot input tabs
-- FastAPI backend
-- Demo cache for showcase supplement verdicts
-- Audio upload endpoint wired for cloud transcription
-- Provider-neutral text generation client
-- Four verdict statuses: `ok`, `out_of_scope`, `no_evidence`, `system_error`
-
-What is next:
-
-- Replace single-claim flow with transcript → multiple claims
-- Add internal source cross-checking
-- Add agreement-gated verdict judging
-- Add influencer and brand profile scoring
+- React/Vite UI: fact-check flow (text, audio, link, screenshot) plus **Influencers** and **Products** credibility views
+- FastAPI backend with multi-claim extraction, dual-agent clip reports, and credibility scoring
+- Chrome extension (popup + side panel) for quick scans and handoff to the web app
+- Production deploy: frontend on Vercel, backend on Render (see [DEPLOY.md](DEPLOY.md))
+- Demo mode and seeded influencer/product data when API keys are not set
 
 ## Prerequisites
 
@@ -104,8 +95,8 @@ The Vite dev server proxies `/api/*` to `http://localhost:8000`.
 5. Veritas transcribes the file and receives a transcript.
 6. The transcript enters the existing extraction/verdict path.
 
-For now, the UI still returns a single extracted claim. The next implementation
-step is changing this to transcript → multiple claims → agreement-gated checks.
+After transcription, use **Extract claims** → select claims → **Run clip report**.
+Include a **creator name** on the report so the Influencers leaderboard updates.
 
 ## Demo Claims
 
@@ -128,7 +119,12 @@ Without API keys, demo mode still works for a few showcase claims:
 | `POST` | `/api/process/url` | Process a URL into text placeholder |
 | `POST` | `/api/process/screenshot` | Process screenshot placeholder |
 | `POST` | `/api/claims/extract` | Extract multiple editable claims from transcript |
-| `POST` | `/api/clip-report` | Search sources and return one Veritas rating when the evidence is clear enough |
+| `POST` | `/api/clip-report` | Search sources, judge agreement, return per-claim ratings (updates credibility ledger when `creator_name` is set) |
+| `POST` | `/api/claims/quick-scan` | Lightweight claim flags for the Chrome extension overlay |
+| `GET` | `/api/influencers` | List influencers with aggregated credibility scores |
+| `GET` | `/api/influencers/{slug}` | Influencer detail, claim history, score breakdown |
+| `GET` | `/api/products` | List supplements/products with credibility scores |
+| `GET` | `/api/products/{product_id}` | Product detail and endorsement history |
 | `POST` | `/api/extract` | Legacy: extract one claim from text |
 | `POST` | `/api/verdict` | Legacy: produce a verdict for one extracted claim |
 
@@ -149,10 +145,14 @@ backend/
     verdict.py            current single-claim verdict path
     retriever.py          seed-corpus keyword retrieval
     demo_cache.py         showcase verdict cache
+    credibility.py        influencer + product scoring ledger
+  influencers.py          legacy Feature 2 API module (credibility_store)
 frontend/
-  src/App.jsx             UI input flow, now including Audio tab
+  src/App.jsx             fact-check UI, influencers/products tabs, extension handoff
   src/VerdictCard.jsx     status-aware verdict renderer
   src/styles.css          light/dark theme system
+chrome-extension/         browser extension (see chrome-extension/README.md)
+DEPLOY.md                 Render + Vercel deployment guide
 PRODUCT_PIVOT_SPEC.md     full pivot spec and roadmap
 .env.example              provider-key setup template
 ```
@@ -170,16 +170,12 @@ PRODUCT_PIVOT_SPEC.md     full pivot spec and roadmap
 - Added `.env.example`
 - Updated README to match the credit-based MVP direction
 
-## Next Build Decision
+## Source Control
 
-Before adding influencer/brand scoring, build Feature 1 properly:
+Team members who have merged PRs: Kennaissa Nabi, and others listed in GitHub pull request history.
 
-1. Transcript/audio input
-2. Multi-claim extraction
-3. User claim review/edit step
-4. Internal evidence cross-checking
-5. Agreement judge
-6. Single user-facing Veritas rating
-7. Clip-level report
+## Next steps
 
-That proves the core product before we attach scores to people and brands.
+- Live transcript scanning and richer extension UX (see open PRs)
+- Stronger source-quality filtering and human review workflows
+- Move credibility ledger from JSON files to a persistent database on Render
