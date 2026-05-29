@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from .auth import require_api_key
 from .pipeline import credibility_store
 
 router = APIRouter(prefix="/api/influencers", tags=["credibility"])
@@ -74,13 +75,13 @@ def influencer_detail(slug: str):
 
 
 @router.delete("/{slug}", status_code=204)
-def delete_influencer(slug: str):
+def delete_influencer(slug: str, _: None = Depends(require_api_key)):
     if not credibility_store.delete_profile(slug):
         raise HTTPException(404, "Influencer not found")
 
 
 @router.post("/seed")
-def seed_demo():
+def seed_demo(_: None = Depends(require_api_key)):
     created = credibility_store.seed_demo()
     if created == 0:
         return {"status": "already_seeded"}

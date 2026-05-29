@@ -1,13 +1,15 @@
 """FastAPI entrypoint. Run with: uvicorn backend.main:app --reload"""
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, preprocessors
+from .auth import require_api_key
 from .influencers import router as influencers_router
 from .models import (
     ClipReportRequest,
@@ -17,6 +19,8 @@ from .models import (
     ExtractClaimsResponse,
     ExtractResponse,
     ProcessResponse,
+    ProcessTextRequest,
+    ProcessUrlRequest,
     ProviderStatus,
     QuickScanRequest,
     QuickScanResponse,
@@ -25,18 +29,36 @@ from .models import (
 )
 from .pipeline import clip_checker, extractor, quick_scan, transcriber, verdict as verdict_pipeline
 from .pipeline import credibility
+from .pipeline import retriever
+
+logger = logging.getLogger("veritas")
 
 app = FastAPI(title="Veritas", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=config.CORS_ALLOW_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(influencers_router)
+
+
+@app.on_event("startup")
+def _warmup_index() -> None:
+    # Build the TF-IDF index once at boot instead of paying the latency on
+    # the first user request, and fail fast in logs if the corpus is empty.
+    try:
+        docs = retriever._load_docs()
+        if not docs:
+            logger.warning("corpus is empty; retriever will return no results")
+        else:
+            retriever._get_index()
+            logger.info("TF-IDF index ready (%d docs)", len(docs))
+    except Exception as e:  # pragma: no cover
+        logger.exception("failed to warm retriever index: %s", e)
 
 
 @app.get("/api/health")
@@ -63,18 +85,18 @@ def health() -> dict:
 
 # --- Pre-processor endpoints (used by the frontend before /extract) ---
 @app.post("/api/process/text", response_model=ProcessResponse)
-def process_text_endpoint(payload: dict) -> ProcessResponse:
+def process_text_endpoint(payload: ProcessTextRequest) -> ProcessResponse:
     try:
-        text = preprocessors.process_text(payload.get("text", ""))
+        text = preprocessors.process_text(payload.text)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return ProcessResponse(text=text, source="text")
 
 
 @app.post("/api/process/url", response_model=ProcessResponse)
-async def process_url_endpoint(payload: dict) -> ProcessResponse:
+async def process_url_endpoint(payload: ProcessUrlRequest) -> ProcessResponse:
     try:
-        text, platform = await preprocessors.process_url(payload.get("url", ""))
+        text, platform = await preprocessors.process_url(payload.url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return ProcessResponse(text=text, source="link", note=f"platform={platform}")
@@ -161,7 +183,7 @@ async def verdict(req: VerdictRequest) -> Verdict:
 
 
 @app.post("/api/clip-report", response_model=ClipReportResponse)
-async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
+async def clip_report(req: ClipReportRequest, _: None = Depends(require_api_key)) -> ClipReportResponse:
     if not req.transcript.strip():
         raise HTTPException(status_code=400, detail="transcript required")
     selected = [claim for claim in req.claims if claim.selected]
@@ -182,8 +204,8 @@ async def clip_report(req: ClipReportRequest) -> ClipReportResponse:
             claim_results=report.claims,
             source_clip=req.brand_name or None,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("failed to record clip credibility: %s", e)
     return report
 
 

@@ -74,3 +74,15 @@ CACHED_VERDICTS_PATH = DATA_DIR / "cached_verdicts.json"
 MAX_INPUT_CHARS = 2000
 MAX_AUDIO_MB = int(os.getenv("MAX_AUDIO_MB", "25"))
 TRANSCRIPTION_TIMEOUT_SECONDS = float(os.getenv("TRANSCRIPTION_TIMEOUT_SECONDS", "120"))
+
+# Optional shared secret. If set, /api/clip-report and influencer mutations
+# require the X-API-Key header to match. If unset (default), endpoints stay
+# open so the deployed demo keeps working without secret rotation.
+API_KEY: str = os.getenv("VERITAS_API_KEY", "")
+
+# Comma-separated list of allowed CORS origins. "*" (default) keeps the
+# extension and any deploy preview working. Set to e.g.
+# "https://veritas-ruby.vercel.app,chrome-extension://<id>" in prod.
+CORS_ALLOW_ORIGINS = [
+	o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",") if o.strip()
+] or ["*"]

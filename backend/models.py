@@ -52,6 +52,14 @@ AgreementLevel = Literal[
 ]
 
 
+class ProcessTextRequest(BaseModel):
+    text: str = Field("", max_length=12000)
+
+
+class ProcessUrlRequest(BaseModel):
+    url: str = Field("", max_length=2000)
+
+
 class ExtractRequest(BaseModel):
     raw_text: str = Field(..., max_length=2000)
     source: SourceMode = "text"
