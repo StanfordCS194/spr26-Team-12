@@ -352,7 +352,7 @@ function InfluencersView({ activeSlug, setActiveSlug }) {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((d) => setList(d.influencers || []))
+      .then((d) => setList(Array.isArray(d) ? d : (d.influencers || [])))
       .catch((e) => setError(String(e)));
   }, []);
 
