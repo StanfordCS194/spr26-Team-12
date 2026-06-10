@@ -78,7 +78,7 @@ class VerdictRequest(BaseModel):
 
 
 class ExtractClaimsRequest(BaseModel):
-    transcript: str = Field(..., max_length=12000)
+    transcript: str = Field(...)
     source: SourceMode = "text"
 
 
@@ -152,7 +152,7 @@ class ClaimCheckResult(BaseModel):
 
 
 class ClipReportRequest(BaseModel):
-    transcript: str = Field(..., max_length=12000)
+    transcript: str = Field(...)
     claims: List[ExtractedClaimItem]
     source: SourceMode = "text"
     creator_name: Optional[str] = None
@@ -164,6 +164,7 @@ class ClipReportResponse(BaseModel):
     transcript: str
     source: SourceMode
     creator_name: Optional[str] = None
+    creator_slug: Optional[str] = None
     brand_name: Optional[str] = None
     claims: List[ClaimCheckResult]
     overall_summary: str
@@ -216,7 +217,7 @@ class ProviderStatus(BaseModel):
     search_provider: str
     openai_configured: bool
     search_configured: bool
-    transcription_configured: bool = False
+    transcription_configured: bool
     groq_configured: bool = False
 
 

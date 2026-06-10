@@ -11,6 +11,8 @@
 const DEMO_TRANSCRIPT =
   'Creatine makes you go bald, BCAAs are required if you want to build muscle, and tongkat ali can double your testosterone naturally.';
 
+const DEFAULT_BACKEND = 'http://localhost:8000';
+
 // Loading-phase choreography. The backend doesn't stream progress, so we
 // fake a smooth multi-step indicator that completes in time with the real
 // network call. Roughly tuned to the typical 30-60s clip-report runtime.
@@ -77,36 +79,10 @@ liveToggleBtn.addEventListener('click', () => {
 
 async function getBase() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get({ backendUrl: VERITAS_DEFAULT_BACKEND }, ({ backendUrl }) => {
-      resolve((backendUrl || VERITAS_DEFAULT_BACKEND).replace(/\/$/, ''));
+    chrome.storage.sync.get({ backendUrl: DEFAULT_BACKEND }, ({ backendUrl }) => {
+      resolve((backendUrl || DEFAULT_BACKEND).replace(/\/$/, ''));
     });
   });
-}
-
-function isLocalUrl(s) {
-  return /localhost|127\.0\.0\.1/i.test(s || '');
-}
-
-/** Resolved URL for "Open full app": uses /api/health web_app_url when frontend is still local but API is hosted. */
-async function getOpenAppUrl() {
-  const base = await getBase();
-  const stored = await new Promise((resolve) => {
-    chrome.storage.sync.get({ frontendUrl: VERITAS_DEFAULT_FRONTEND }, resolve);
-  });
-  let url = (stored.frontendUrl || VERITAS_DEFAULT_FRONTEND).replace(/\/$/, '');
-  if (isLocalUrl(url) && !isLocalUrl(base)) {
-    try {
-      const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) {
-        const data = await res.json();
-        const fromApi = typeof data.web_app_url === 'string' ? data.web_app_url.trim().replace(/\/$/, '') : '';
-        if (fromApi) url = fromApi;
-      }
-    } catch (_) {
-      /* keep stored url */
-    }
-  }
-  return url;
 }
 
 // ── API helpers ─────────────────────────────────────────────────────────────
@@ -597,24 +573,26 @@ function renderReport() {
     render();
   });
 
-  document.getElementById('openAppBtn').addEventListener('click', async () => {
-    const base = (await getOpenAppUrl()).replace(/\/$/, '');
-    const params = new URLSearchParams();
-    // Pre-populate the web app's textarea with whatever the user just
-    // checked in the extension. Use transcript when present (it's the
-    // normalized form), otherwise fall back to the original input.
-    // Prefer the normalized transcript we sent to the backend, but fall
-    // back to the raw textarea contents (covers the case where the user
-    // hits "Open full app" before running Extract).
-    const textareaEl = document.getElementById('inputText');
-    const handoffText = (transcript || (textareaEl && textareaEl.value) || '').trim();
-    if (handoffText) params.set('text', handoffText.slice(0, 12000));
-    const creatorEl = document.getElementById('creatorInput');
-    const handoffCreator = (creatorName || (creatorEl && creatorEl.value) || '').trim();
-    if (handoffCreator) params.set('creator', handoffCreator.slice(0, 120));
-    params.set('source', 'extension');
-    const query = params.toString();
-    chrome.tabs.create({ url: query ? `${base}/?${query}` : base });
+  document.getElementById('openAppBtn').addEventListener('click', () => {
+    chrome.storage.sync.get({ frontendUrl: 'https://veritas-ruby.vercel.app' }, ({ frontendUrl }) => {
+      const base = (frontendUrl || 'https://veritas-ruby.vercel.app').replace(/\/$/, '');
+      const params = new URLSearchParams();
+      // Pre-populate the web app's textarea with whatever the user just
+      // checked in the extension. Use transcript when present (it's the
+      // normalized form), otherwise fall back to the original input.
+      // Prefer the normalized transcript we sent to the backend, but fall
+      // back to the raw textarea contents (covers the case where the user
+      // hits "Open full app" before running Extract).
+      const textareaEl = document.getElementById('inputText');
+      const handoffText = (transcript || (textareaEl && textareaEl.value) || '').trim();
+      if (handoffText) params.set('text', handoffText.slice(0, 12000));
+      const creatorEl = document.getElementById('creatorInput');
+      const handoffCreator = (creatorName || (creatorEl && creatorEl.value) || '').trim();
+      if (handoffCreator) params.set('creator', handoffCreator.slice(0, 120));
+      params.set('source', 'extension');
+      const query = params.toString();
+      chrome.tabs.create({ url: query ? `${base}/?${query}` : base });
+    });
   });
 }
 
