@@ -32,6 +32,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("veritas")
 from .pipeline import clip_checker, extractor, quick_scan, transcriber, verdict as verdict_pipeline
 from .pipeline import credibility
+from .influencers import router as influencers_router
 
 app = FastAPI(title="Veritas", version="0.2.0")
 
@@ -42,6 +43,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(influencers_router)
 
 @app.get("/api/health")
 def health() -> dict:

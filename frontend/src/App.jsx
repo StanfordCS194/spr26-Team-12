@@ -11,6 +11,21 @@ function detectPlatform(url) {
   return null;
 }
 
+/** Vercel/Render often return HTML or plain text on 5xx; avoid response.json() on errors. */
+async function readApiError(response) {
+  const text = await response.text();
+  try {
+    const j = JSON.parse(text);
+    if (j && typeof j === 'object' && j.detail != null) return String(j.detail);
+    if (j && typeof j === 'object' && j.message != null) return String(j.message);
+  } catch {
+    /* not JSON */
+  }
+  const trimmed = text.trim();
+  if (trimmed) return trimmed.slice(0, 400);
+  return `Request failed (HTTP ${response.status})`;
+}
+
 function useTheme() {
   const [theme, setTheme] = useState(
     () => document.documentElement.dataset.theme || 'light'
@@ -730,7 +745,7 @@ export default function App() {
         body: JSON.stringify({ text }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Text processing failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     if (tab === 'link') {
@@ -740,7 +755,7 @@ export default function App() {
         body: JSON.stringify({ url }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Link processing failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     if (tab === 'screenshot') {
@@ -752,7 +767,7 @@ export default function App() {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Screenshot processing failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     if (tab === 'audio') {
@@ -764,7 +779,7 @@ export default function App() {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Audio transcription failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       return (await response.json()).text;
     }
     throw new Error('Unknown input type.');
@@ -783,7 +798,7 @@ export default function App() {
         body: JSON.stringify({ transcript: processed, source: tab }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Claim extraction failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       const payload = await response.json();
       setClaims(payload.claims || []);
       setState('review');
@@ -811,7 +826,7 @@ export default function App() {
         }),
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error((await response.json()).detail || 'Report generation failed');
+      if (!response.ok) throw new Error(await readApiError(response));
       setReport(await response.json());
       setState('report');
     } catch (err) {
