@@ -52,6 +52,37 @@ async def process_url(url: str) -> Tuple[str, str]:
                 text = trafilatura.extract(downloaded) or None
         except Exception:
             text = None
+    elif platform == "youtube" and config.SERPAPI_API_KEY:
+        # Use SerpAPI text transcript — faster and doesn't hit yt-dlp bot blocks.
+        try:
+            import httpx
+            video_id_match = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+            if not video_id_match:
+                raise ValueError("Could not extract YouTube video ID from URL.")
+            video_id = video_id_match.group(1)
+            params = {
+                "engine": "youtube_video_transcript",
+                "v": video_id,
+                "lang": "en",
+                "api_key": config.SERPAPI_API_KEY,
+            }
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get("https://serpapi.com/search.json", params=params)
+            if res.status_code == 200:
+                segments = res.json().get("transcript", [])
+                text = " ".join(s.get("snippet", "") for s in segments if s.get("snippet", "").strip()) or None
+        except Exception:
+            text = None
+        # Fall back to yt-dlp if SerpAPI returned nothing.
+        if not text:
+            try:
+                import asyncio
+                from .pipeline import youtube_audio, transcriber
+                max_bytes = config.MAX_AUDIO_MB * 1024 * 1024
+                data, filename, mime = await asyncio.to_thread(youtube_audio.download_audio, url, max_bytes)
+                text = await transcriber.transcribe_audio(filename, mime, data)
+            except Exception as exc:
+                raise ValueError(f"Could not transcribe youtube link: {exc}")
     else:
         # video / social platforms — fetch audio and transcribe.
         try:
