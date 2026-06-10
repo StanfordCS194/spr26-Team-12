@@ -333,7 +333,10 @@ function InfluencersView({ activeSlug, setActiveSlug }) {
 
   useEffect(() => {
     fetch('/api/influencers')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => setList(d.influencers || []))
       .catch((e) => setError(String(e)));
   }, []);
@@ -358,6 +361,11 @@ function InfluencersView({ activeSlug, setActiveSlug }) {
         Scores aggregate every Veritas fact-check attributed to that creator.
         High score ≠ every product they push is good (see Products).
       </p>
+      {list.length === 0 && (
+        <p className="muted-note">
+          No influencers yet. Run a clip report from Fact Check with a creator name filled in.
+        </p>
+      )}
       <div className="influencer-grid">
         {list.map((inf) => (
           <button key={inf.slug} className="influencer-card" onClick={() => setActiveSlug(inf.slug)}>

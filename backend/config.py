@@ -37,7 +37,7 @@ DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
 # Credit-based model providers.
 PRIMARY_LLM_PROVIDER: str = os.getenv("PRIMARY_LLM_PROVIDER", "openai").lower()
-SECONDARY_LLM_PROVIDER: str = os.getenv("SECONDARY_LLM_PROVIDER", "openai").lower()
+SECONDARY_LLM_PROVIDER: str = os.getenv("SECONDARY_LLM_PROVIDER", "groq").lower()
 SEARCH_PROVIDER: str = os.getenv("SEARCH_PROVIDER", "tavily").lower()
 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
@@ -49,7 +49,6 @@ OPENAI_WHISPER_MODEL: str = os.getenv("OPENAI_WHISPER_MODEL", "whisper-1")
 # Groq over OpenAI unless TRANSCRIPTION_PROVIDER overrides it.
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 GROQ_TEXT_MODEL: str = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
-GROQ_TRANSCRIPTION_MODEL: str = os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo")
 GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3")
 TRANSCRIPTION_PROVIDER: str = os.getenv(
 	"TRANSCRIPTION_PROVIDER",
