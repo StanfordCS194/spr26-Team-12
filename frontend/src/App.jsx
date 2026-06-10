@@ -236,11 +236,20 @@ function RecommendationsSection({ item }) {
 }
 function ReportView({ report }) {
   const claims = report.claims;
-  // Single-claim case is the primary UX target: show the verdict as the
-  // headline, with a source count as the only number on screen. Multi-claim
-  // reports get a verdict tally instead of a single aggregate score.
-  const single = claims.length === 1 && hasSystemVerdict(claims[0]) ? claims[0] : null;
-  const totalSources = claims.reduce((acc, c) => acc + (c.sources?.length || 0), 0);
+  // Treat a one-claim report as single-claim UX regardless of verdict state:
+  // if the one claim has no system verdict we still show an UNVERIFIED hero
+  // instead of falling through to a multi-claim tally with 0 badges.
+  const isSingle = claims.length === 1;
+  const soloClaim = isSingle ? claims[0] : null;
+  // Dedupe sources by URL across claims — the same paper can back multiple
+  // claims, but it's still one source.
+  const uniqueSourceUrls = new Set();
+  for (const c of claims) {
+    for (const s of c.sources || []) {
+      if (s?.url) uniqueSourceUrls.add(s.url);
+    }
+  }
+  const totalSources = uniqueSourceUrls.size;
   const tally = {};
   for (const c of claims) {
     if (hasSystemVerdict(c)) {
@@ -248,19 +257,23 @@ function ReportView({ report }) {
       tally[d] = (tally[d] || 0) + 1;
     }
   }
+  const soloDirection = soloClaim
+    ? (hasSystemVerdict(soloClaim) ? soloClaim.agreement.final_direction : 'insufficient')
+    : null;
+  const soloSourceCount = soloClaim ? new Set((soloClaim.sources || []).map((s) => s.url).filter(Boolean)).size : 0;
   return (
     <div className="report-stack">
       <div className="panel report-hero">
         <div>
           <div className="label">Verdict</div>
-          {single ? (
+          {isSingle ? (
             <>
               <h2>
-                <span className={`direction dir-${single.agreement.final_direction}`} style={{ fontSize: '1.6rem', padding: '6px 14px' }}>
-                  {directionLabel(single.agreement.final_direction)}
+                <span className={`direction dir-${soloDirection}`} style={{ fontSize: '1.6rem', padding: '6px 14px' }}>
+                  {directionLabel(soloDirection)}
                 </span>
               </h2>
-              <p className="muted-note">Based on {single.sources.length} credible source{single.sources.length === 1 ? '' : 's'}.</p>
+              <p className="muted-note">Based on {soloSourceCount} credible source{soloSourceCount === 1 ? '' : 's'}.</p>
             </>
           ) : (
             <>
